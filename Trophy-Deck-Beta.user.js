@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.0-beta.8
+// @version      1.0.9
 // @description  Persönliche Erweiterungen für PSNProfiles und PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -76,7 +76,7 @@
         const counts = JSON.parse(localStorage.getItem('trophydeck.usage') || '{}');
         const settings = Object.fromEntries(features.filter(f => f.key !== 'trophydeck.analytics').map(f => [f.key.replace('trophydeck.', ''), enabled(f.key)]));
         const appearance={theme:localStorage.getItem('trophydeck.theme')||'Blau',side:localStorage.getItem('trophydeck.side')||'right',mode:localStorage.getItem('trophydeck.positionMode')||'follow',width:railWidth(),heightPercent:Number(localStorage.getItem('trophydeck.panelHeight')||72)};
-        const blob = new Blob([JSON.stringify({ version:'Beta 1.0', counters:counts, settings, appearance }, null, 2)], {type:'application/json'});
+        const blob = new Blob([JSON.stringify({ version:'Beta 1.0.9', counters:counts, settings, appearance }, null, 2)], {type:'application/json'});
         const url = URL.createObjectURL(blob), a = document.createElement('a');
         a.href = url; a.download = 'trophy-deck-nutzung.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
@@ -135,7 +135,7 @@
     }
     function exportData() {
         const data={};for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key&&key.startsWith('trophydeck.')){ data[key]=localStorage.getItem(key); }}
-        const url=URL.createObjectURL(new Blob([JSON.stringify({format:'Trophy Deck',version:1,appVersion:'1.0.0-beta.7',data},null,2)],{type:'application/json'}));
+        const url=URL.createObjectURL(new Blob([JSON.stringify({format:'Trophy Deck',version:1,appVersion:'1.0.9',data},null,2)],{type:'application/json'}));
         const a=make('a');a.href=url;a.download='trophy-deck-daten.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);logEvent('export.all');
     }
     // Backup format 1 is permanent: future versions must retain this reader and
@@ -293,7 +293,7 @@
             width.max=String(maxRailWidth());width.value=String(railWidth());
             const effective=Math.max(0,Math.min(Number(width.value),window.innerWidth*.45,window.innerWidth-40));
             widthValue.textContent=Math.round(effective)+' px ('+(100*effective/window.innerWidth).toFixed(1)+' % der Fensterbreite)';
-            viewportHeader.textContent='Beta 1.0 · Browserfenster '+window.innerWidth+' × '+window.innerHeight+' px';
+            viewportHeader.textContent='Beta 1.0.9 · Browserfenster '+window.innerWidth+' × '+window.innerHeight+' px';
             viewportHint.textContent='Empfohlene Breite: etwa '+recommendedRailWidth()+' px. Trophy Deck belegt höchstens 45 % der Fensterbreite.';
             heightValue.textContent=height.value+' % ('+Math.round(window.innerHeight*Number(height.value)/100)+' px)';
             panelHeightValue.textContent=panelHeight.value+' % ('+Math.round(window.innerHeight*Number(panelHeight.value)/100)+' px)';
