@@ -1,9 +1,8 @@
 // ==UserScript==
 // @name         Trophy Deck
 // @namespace    trophydeck.local
-// @updateURL    https://drive.google.com/uc?export=download&id=13m2qJShL_S0NhPmvtMrvzNSD7WmvQon6
-// @downloadURL  https://drive.google.com/uc?export=download&id=13m2qJShL_S0NhPmvtMrvzNSD7WmvQon6
-// @version      1.0.0-beta.7
+// @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.js
+// @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.js
 // @description  Persönliche Erweiterungen für PSNProfiles und PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
