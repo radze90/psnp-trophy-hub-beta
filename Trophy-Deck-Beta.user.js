@@ -3,8 +3,8 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.9
-// @description  Persönliche Erweiterungen für PSNProfiles und PSNP+
+// @version      1.0.10
+// @description  Erweiterungen für PSNProfiles und PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
 // @noframes
@@ -13,7 +13,6 @@
 
 (function () {
     'use strict';
-    // Einstellungen und Notizen der bisherigen PSNPepic-Version einmalig übernehmen.
     for (let i = localStorage.length - 1; i >= 0; i--) {
         const oldKey = localStorage.key(i);
         if (oldKey && oldKey.startsWith('psnpepic.')) {
@@ -138,8 +137,6 @@
         const url=URL.createObjectURL(new Blob([JSON.stringify({format:'Trophy Deck',version:1,appVersion:'1.0.9',data},null,2)],{type:'application/json'}));
         const a=make('a');a.href=url;a.download='trophy-deck-daten.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);logEvent('export.all');
     }
-    // Backup format 1 is permanent: future versions must retain this reader and
-    // migrate its normalized result before applying any new storage schema.
     function parseBackup(text) {
         let backup;
         try { backup=JSON.parse(text); } catch (_) { throw new Error('Die Datei enthält kein gültiges JSON.'); }
