@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.17
+// @version      1.0.18
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.17";
+const APP_VERSION = "1.0.18";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -2030,6 +2030,7 @@ function applyProfileLayout() {
         }
     }
     syncProfileGrid(areas);
+    if (profileLayoutEditing) for (const item of items) if (sections[item.id]) updateProfileSectionControls(sections[item.id], item);
 }
 
 function syncProfileGrid(areas) {
@@ -2141,6 +2142,22 @@ function updateProfileSectionControls(section, item) {
             const current = items.find(entry => entry.id === section.dataset.tdProfileSection);
             if (current) { current.hidden = !current.hidden; saveProfileLayout(items); }
         });
+        function moveButton(symbol, direction, label) {
+            const button = make('button', symbol, direction < 0 ? 'td-profile-up' : 'td-profile-down');
+            button.type = 'button'; button.title = t(label);
+            button.setAttribute('aria-label', t(label) + ': ' + t(profileLayoutDefinitions.find(entry => entry.id === item.id).label));
+            button.addEventListener('click', () => {
+                const siblings = Array.from(section.parentElement.children).filter(child => child.dataset.tdProfileSection);
+                const index = siblings.indexOf(section), neighbor = siblings[index + direction];
+                if (!neighbor) return;
+                const items = readProfileLayout();
+                const current = items.find(entry => entry.id === section.dataset.tdProfileSection);
+                if (current) saveProfileLayout(moveProfileSection(items, current.id, current.zone, neighbor.dataset.tdProfileSection, direction > 0));
+            });
+            return button;
+        }
+        const up = moveButton('↑', -1, 'Move section up');
+        const down = moveButton('↓', 1, 'Move section down');
         const width = make('button', '', 'td-profile-width'); width.type = 'button';
         width.addEventListener('click', () => {
             const items = readProfileLayout();
@@ -2150,7 +2167,7 @@ function updateProfileSectionControls(section, item) {
             else { current.restoreZone = current.zone; current.zone = 'top'; }
             saveProfileLayout(items);
         });
-        toolbar.append(handle, title, width, visibility); section.prepend(toolbar);
+        toolbar.append(handle, title, up, down, width, visibility); section.prepend(toolbar);
     }
     const width = toolbar.querySelector('.td-profile-width');
     const wide = ['top','bottom'].includes(item.zone);
@@ -2160,7 +2177,11 @@ function updateProfileSectionControls(section, item) {
     width.setAttribute('aria-label', width.title + ': ' + t(profileLayoutDefinitions.find(entry => entry.id === item.id).label));
     width.setAttribute('aria-pressed', String(wide));
     const visibility = toolbar.querySelector('.td-profile-visibility');
-    const visibilityText = item.hidden ? t('Show') : t('Hide');
+    const siblings = Array.from(section.parentElement.children).filter(child => child.dataset.tdProfileSection);
+    const siblingIndex = siblings.indexOf(section);
+    toolbar.querySelector('.td-profile-up').disabled = siblingIndex <= 0;
+    toolbar.querySelector('.td-profile-down').disabled = siblingIndex < 0 || siblingIndex >= siblings.length - 1;
+    const visibilityText = item.hidden ? '⊘' : '◉';
     if (visibility.textContent !== visibilityText) visibility.textContent = visibilityText;
     visibility.title = item.hidden ? t('Show section') : t('Hide section');
     visibility.setAttribute('aria-label', visibility.title + ': ' + t(profileLayoutDefinitions.find(entry => entry.id === item.id).label));
@@ -2750,6 +2771,36 @@ html.trophydeck-psnp-colors a.scroll-top { background-color:var(--td-accent) !im
 #content .td-profile-grid.td-profile-main-empty.td-profile-columns-1 > [data-td-profile-zone="center"] { grid-column:2; }
 #content .td-profile-grid.td-profile-main-empty.td-profile-columns-1 > .sidebar { grid-column:3; }
 @media (max-width:800px) { #content .td-profile-grid.td-profile-main-empty.td-profile-columns-1 > .sidebar, #content .td-profile-grid.td-profile-main-empty.td-profile-columns-1 > [data-td-profile-zone="center"] { grid-column:1; } }
+/* Flexbox Grid's column max-width must not constrain items inside our CSS grid. */
+#content .td-profile-grid > .col-xs-8,
+#content .td-profile-grid > .sidebar,
+#content .td-profile-grid > .td-profile-small-column {
+    width:100% !important;
+    max-width:none !important;
+    min-width:0;
+    box-sizing:border-box;
+    justify-self:stretch;
+}
+/* All layout-editor controls share the same touch target and centered glyph. */
+#td-profile-layout-bar button,
+#content .td-profile-section-controls button {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 32px;
+    width:32px;
+    min-width:32px;
+    max-width:32px;
+    height:32px;
+    min-height:32px;
+    padding:0;
+    margin:0;
+    box-sizing:border-box;
+    font:600 17px/1 Arial,sans-serif;
+    text-align:center;
+}
+#content .td-profile-section-controls { gap:4px; }
+#content .td-profile-section-controls button:disabled { opacity:.4; cursor:default; }
 `;
     document.head.append(style);
     applyTheme();
