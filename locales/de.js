@@ -275,5 +275,15 @@ var __trophyDeckLocale_de = {
   "Hide section": "Bereich ausblenden",
   "Use “Edit profile layout” on a profile page to move or hide sections.": "Wähle auf einer Profilseite „Profilbereiche bearbeiten“, um Bereiche zu verschieben oder auszublenden.",
   "Drag sections by their handles to a highlighted position. Hidden sections remain visible while editing.": "Ziehe Bereiche am Griff an eine markierte Position. Ausgeblendete Bereiche bleiben während der Bearbeitung sichtbar.",
-  "On a profile page, select Edit profile layout. Drag sections into position and use Hide or Show. Reset the layout in Settings → Profile page.": "Wähle auf einer Profilseite „Profilbereiche bearbeiten“. Ziehe Bereiche an die gewünschte Position und blende sie ein oder aus. Unter Einstellungen → Profilseite kannst du die Anordnung zurücksetzen."
+  "On a profile page, select Edit profile layout. Drag sections into position and use Hide or Show. Reset the layout in Settings → Profile page.": "Wähle auf einer Profilseite „Profilbereiche bearbeiten“. Ziehe Bereiche an die gewünschte Position und blende sie ein oder aus. Unter Einstellungen → Profilseite kannst du die Anordnung zurücksetzen.",
+  "Done editing profile layout": "Profilbearbeitung abschließen",
+  "Restore section width": "Vorherige Breite wiederherstellen",
+  "Expand section to full width": "Bereich auf volle Breite vergrößern",
+  "Full width · top": "Volle Breite · oben",
+  "Games area": "Spielebereich",
+  "Left column": "Linke Spalte",
+  "Middle column": "Mittlere Spalte",
+  "Right column": "Rechte Spalte",
+  "Full width · bottom": "Volle Breite · unten",
+  "Use the edit icon beside the profile name. Drag small sections into the left, middle or right column; use the width icon for full width. The reset icon appears while editing.": "Verwende das Bearbeitungssymbol neben dem Profilnamen. Ziehe kleine Bereiche in die linke, mittlere oder rechte Spalte; mit dem Breitensymbol schaltest du auf volle Breite. Das Zurücksetzen-Symbol erscheint während der Bearbeitung."
 };

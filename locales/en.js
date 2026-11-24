@@ -275,5 +275,15 @@ var __trophyDeckLocale_en = {
   "Hide section": "Hide section",
   "Use “Edit profile layout” on a profile page to move or hide sections.": "Use “Edit profile layout” on a profile page to move or hide sections.",
   "Drag sections by their handles to a highlighted position. Hidden sections remain visible while editing.": "Drag sections by their handles to a highlighted position. Hidden sections remain visible while editing.",
-  "On a profile page, select Edit profile layout. Drag sections into position and use Hide or Show. Reset the layout in Settings → Profile page.": "On a profile page, select Edit profile layout. Drag sections into position and use Hide or Show. Reset the layout in Settings → Profile page."
+  "On a profile page, select Edit profile layout. Drag sections into position and use Hide or Show. Reset the layout in Settings → Profile page.": "On a profile page, select Edit profile layout. Drag sections into position and use Hide or Show. Reset the layout in Settings → Profile page.",
+  "Done editing profile layout": "Done editing profile layout",
+  "Restore section width": "Restore section width",
+  "Expand section to full width": "Expand section to full width",
+  "Full width · top": "Full width · top",
+  "Games area": "Games area",
+  "Left column": "Left column",
+  "Middle column": "Middle column",
+  "Right column": "Right column",
+  "Full width · bottom": "Full width · bottom",
+  "Use the edit icon beside the profile name. Drag small sections into the left, middle or right column; use the width icon for full width. The reset icon appears while editing.": "Use the edit icon beside the profile name. Drag small sections into the left, middle or right column; use the width icon for full width. The reset icon appears while editing."
 };

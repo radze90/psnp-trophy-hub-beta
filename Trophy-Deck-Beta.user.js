@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.16
+// @version      1.0.17
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.16";
+const APP_VERSION = "1.0.17";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -708,7 +708,7 @@ function openFeatureGuide() {
                 [t("Size and behavior"), t("Under Settings → Trophy Deck, adjust the side, width, height, position and scrolling behavior, or restore defaults.")]
             ]],
         [t("On profile and game pages"), [
-                [t("Profile layout"), t("On a profile page, select Edit profile layout. Drag sections into position and use Hide or Show. Reset the layout in Settings → Profile page.")],
+                [t("Profile layout"), t("Use the edit icon beside the profile name. Drag small sections into the left, middle or right column; use the width icon for full width. The reset icon appears while editing.")],
                 [t("Game notes"), t("Click the note below a game or on its trophy page. Text is saved locally as you type; clicking outside closes the editor. Web links are clickable.")],
                 [t("Game cabinet"), t("Use the star beside a game to save it to the displayed profile’s cabinet. Hover over its cover to reveal the remove button.")],
                 [t("Profile navigation"), t("Optionally keep the upper navigation with Profile, Trophy Log and Stats visible while scrolling.")]
@@ -1921,7 +1921,7 @@ function readProfileLayout() {
     return order.map(id => {
         const definition = profileLayoutDefinitions.find(item => item.id === id);
         const previous = items.find(item => item && item.id === id) || {};
-        return {id, zone:['top','main','sidebar'].includes(previous.zone) ? previous.zone : definition.zone, hidden:previous.hidden === true};
+        return {id, zone:['top','main','left','center','sidebar','bottom'].includes(previous.zone) ? (id === 'games' && ['left','center','sidebar'].includes(previous.zone) ? 'main' : (id !== 'games' && previous.zone === 'main' ? 'left' : previous.zone)) : definition.zone, hidden:previous.hidden === true, restoreZone:(id === 'games' ? 'main' : (['left','center','sidebar'].includes(previous.restoreZone) ? previous.restoreZone : 'sidebar'))};
     });
 }
 
@@ -1945,7 +1945,16 @@ function profileLayoutAreas() {
         top.dataset.tdProfileZone = 'top';
         row.before(top);
     }
-    return {content, top, main, sidebar};
+    function ensureZone(name) {
+        let zone = row.querySelector(':scope > [data-td-profile-zone="' + name + '"]');
+        if (!zone) { zone = make('div', null, 'td-profile-small-column'); zone.dataset.tdProfileZone = name; row.append(zone); }
+        return zone;
+    }
+    const left = ensureZone('left'), center = ensureZone('center');
+    let bottom = content.querySelector(':scope > [data-td-profile-zone="bottom"]');
+    if (!bottom) { bottom = make('div', null, 'td-profile-bottom'); bottom.dataset.tdProfileZone = 'bottom'; row.after(bottom); }
+    row.classList.add('td-profile-grid');
+    return {content, row, top, main, left, center, sidebar, bottom};
 }
 
 function collectProfileSections(areas) {
@@ -2009,8 +2018,8 @@ function applyProfileLayout() {
         if (profileLayoutEditing) updateProfileSectionControls(sections[item.id], item);
     }
     // Preserve the site's exact original order until the user changes the layout.
-    if (!localStorage.getItem(profileLayoutKey) && !profileLayoutEditing) return;
-    for (const zone of ['top','main','sidebar']) {
+    if (!localStorage.getItem(profileLayoutKey) && !profileLayoutEditing) { syncProfileGrid(areas); return; }
+    for (const zone of ['top','main','left','center','sidebar','bottom']) {
         const target = areas[zone];
         let anchor = null;
         for (const item of items.filter(entry => entry.zone === zone).reverse()) {
@@ -2020,11 +2029,34 @@ function applyProfileLayout() {
             anchor = section;
         }
     }
+    syncProfileGrid(areas);
+}
+
+function syncProfileGrid(areas) {
+    const mainOccupied = Array.from(areas.main.children).some(child => !child.hidden);
+    areas.row.classList.toggle('td-profile-main-empty', !mainOccupied && !profileLayoutEditing);
+    const smallZones = ['left', 'center', 'sidebar'];
+    let count = 0;
+    for (const zone of smallZones) {
+        const container = areas[zone];
+        const occupied = Array.from(container.children).some(child => !child.hidden && (!child.dataset.tdProfileSection || child.classList.contains('td-profile-section')));
+        container.classList.toggle('td-profile-zone-empty', !occupied && !profileLayoutEditing);
+        if (occupied || profileLayoutEditing) count++;
+    }
+    for (let number = 0; number <= 3; number++) areas.row.classList.toggle('td-profile-columns-' + number, number === count);
 }
 
 // Reorder data separately from the DOM, so absent and hidden sections remain intact.
+function canDropProfileSection(item, zone) {
+    if (item.id === 'games') return zone === 'main' || (['top','bottom'].includes(item.zone) && ['top','bottom'].includes(zone));
+    if (['top','bottom'].includes(item.zone)) return ['top','bottom'].includes(zone);
+    return ['left','center','sidebar'].includes(zone);
+}
+
 function moveProfileSection(items, id, zone, targetId, after = false) {
-    if (!['top','main','sidebar'].includes(zone)) return items;
+    if (!['top','main','left','center','sidebar','bottom'].includes(zone)) return items;
+    const current = items.find(item => item.id === id);
+    if (!current || !canDropProfileSection(current, zone)) return items;
     const next = items.map(item => ({...item}));
     const source = next.findIndex(item => item.id === id);
     if (source < 0 || id === targetId) return next;
@@ -2058,6 +2090,8 @@ function installProfileDropZone(container, zone) {
     }
     container.addEventListener('dragover', event => {
         if (!profileLayoutEditing || !draggedProfileSection) return;
+        const current = readProfileLayout().find(item => item.id === draggedProfileSection);
+        if (!current || !canDropProfileSection(current, zone)) return;
         event.preventDefault(); event.dataTransfer.dropEffect = 'move';
         clearProfileDropIndicators();
         const target = findTarget(event);
@@ -2068,6 +2102,8 @@ function installProfileDropZone(container, zone) {
     });
     container.addEventListener('drop', event => {
         if (!profileLayoutEditing || !draggedProfileSection) return;
+        const current = readProfileLayout().find(item => item.id === draggedProfileSection);
+        if (!current || !canDropProfileSection(current, zone)) return;
         event.preventDefault();
         const target = findTarget(event);
         const targetId = target?.dataset.tdProfileSection || null;
@@ -2105,8 +2141,24 @@ function updateProfileSectionControls(section, item) {
             const current = items.find(entry => entry.id === section.dataset.tdProfileSection);
             if (current) { current.hidden = !current.hidden; saveProfileLayout(items); }
         });
-        toolbar.append(handle, title, visibility); section.prepend(toolbar);
+        const width = make('button', '', 'td-profile-width'); width.type = 'button';
+        width.addEventListener('click', () => {
+            const items = readProfileLayout();
+            const current = items.find(entry => entry.id === section.dataset.tdProfileSection);
+            if (!current) return;
+            if (['top','bottom'].includes(current.zone)) current.zone = current.id === 'games' ? 'main' : current.restoreZone;
+            else { current.restoreZone = current.zone; current.zone = 'top'; }
+            saveProfileLayout(items);
+        });
+        toolbar.append(handle, title, width, visibility); section.prepend(toolbar);
     }
+    const width = toolbar.querySelector('.td-profile-width');
+    const wide = ['top','bottom'].includes(item.zone);
+    const widthText = wide ? '⊟' : '⛶';
+    if (width.textContent !== widthText) width.textContent = widthText;
+    width.title = wide ? t('Restore section width') : t('Expand section to full width');
+    width.setAttribute('aria-label', width.title + ': ' + t(profileLayoutDefinitions.find(entry => entry.id === item.id).label));
+    width.setAttribute('aria-pressed', String(wide));
     const visibility = toolbar.querySelector('.td-profile-visibility');
     const visibilityText = item.hidden ? t('Show') : t('Hide');
     if (visibility.textContent !== visibilityText) visibility.textContent = visibilityText;
@@ -2120,14 +2172,16 @@ function setProfileLayoutEditing(editing) {
     profileLayoutEditing = editing;
     const bar = document.getElementById('td-profile-layout-bar');
     if (bar) {
-        const button = bar.querySelector('button');
-        button.textContent = editing ? t('Done') : t('Edit profile layout');
+        const button = bar.querySelector('.td-profile-layout-edit');
+        button.textContent = editing ? '✓' : '✎';
+        button.title = editing ? t('Done editing profile layout') : t('Edit profile layout');
+        button.setAttribute('aria-label', button.title);
         button.setAttribute('aria-pressed', String(editing));
-        const hint = bar.querySelector('small');
-        hint.hidden = !editing;
+        bar.querySelector('.td-profile-layout-reset').hidden = !editing;
     }
-    for (const zone of ['top','main','sidebar']) {
+    for (const zone of ['top','main','left','center','sidebar','bottom']) {
         areas[zone].classList.toggle('td-profile-edit-zone', editing);
+        areas[zone].dataset.tdDropLabel = t(({top:'Full width · top', main:'Games area', left:'Left column', center:'Middle column', sidebar:'Right column', bottom:'Full width · bottom'})[zone]);
         installProfileDropZone(areas[zone], zone);
     }
     if (!editing) {
@@ -2143,13 +2197,20 @@ function setProfileLayoutEditing(editing) {
 function setupProfileLayoutEditor() {
     const areas = profileLayoutAreas();
     if (!areas || document.getElementById('td-profile-layout-bar')) return;
-    const bar = make('div', null, 'td-profile-layout-bar'); bar.id = 'td-profile-layout-bar';
-    const button = make('button', t('Edit profile layout'), 'td-profile-layout-edit');
-    button.type = 'button'; button.setAttribute('aria-pressed', 'false');
+    const profile = profileInfo();
+    const titleBar = profile?.nav.closest('.title-bar');
+    const heading = titleBar?.querySelector('h3');
+    if (!heading || !heading.parentElement) return;
+    const bar = make('span', null, 'td-profile-layout-bar'); bar.id = 'td-profile-layout-bar';
+    const button = make('button', '✎', 'td-profile-layout-edit');
+    button.type = 'button'; button.title = t('Edit profile layout');
+    button.setAttribute('aria-label', button.title); button.setAttribute('aria-pressed', 'false');
     button.addEventListener('click', () => setProfileLayoutEditing(!profileLayoutEditing));
-    const hint = make('small', t('Drag sections by their handles to a highlighted position. Hidden sections remain visible while editing.'));
-    hint.hidden = true;
-    bar.append(button, hint); areas.top.before(bar);
+    const reset = make('button', '↺', 'td-profile-layout-reset');
+    reset.type = 'button'; reset.title = t('Restore profile layout');
+    reset.setAttribute('aria-label', reset.title); reset.hidden = true;
+    reset.addEventListener('click', resetProfileLayout);
+    bar.append(button, reset); heading.parentElement.append(bar);
 }
 
 
@@ -2665,6 +2726,30 @@ html.trophydeck-psnp-colors a.scroll-top { background-color:var(--td-accent) !im
 .td-profile-drop-before { box-shadow:inset 0 5px var(--td-accent,#315c89); }
 .td-profile-drop-after { box-shadow:inset 0 -5px var(--td-accent,#315c89); }
 .td-profile-drop-zone { background:color-mix(in srgb,var(--td-accent,#315c89) 18%,transparent); }
+/* Responsive profile grid: game list is always at least two columns wide. */
+#content .row.td-profile-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); align-items:start; }
+#content .td-profile-grid > .col-xs-8, #content .td-profile-grid > .sidebar, #content .td-profile-grid > .td-profile-small-column { width:auto !important; float:none !important; min-width:0; }
+#content .td-profile-grid > .col-xs-8 { grid-column:span 2; order:2; }
+#content .td-profile-grid > [data-td-profile-zone="left"] { order:1; }
+#content .td-profile-grid > [data-td-profile-zone="center"] { order:3; }
+#content .td-profile-grid > .sidebar { order:4; }
+#content .td-profile-grid.td-profile-columns-0 > .col-xs-8 { grid-column:1 / -1; }
+#content .td-profile-grid.td-profile-columns-2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
+#content .td-profile-grid.td-profile-columns-2 > .col-xs-8, #content .td-profile-grid.td-profile-columns-3 > .col-xs-8 { grid-column:1 / -1; order:0; }
+#content .td-profile-grid > .td-profile-zone-empty { display:none; }
+#content .td-profile-small-column { padding:0 5px; }
+#content .td-profile-section-controls .td-profile-width { min-width:32px; padding:4px 8px; font-size:18px; line-height:1; }
+#td-profile-layout-bar { position:static; display:inline-flex; vertical-align:middle; gap:3px; padding:0; margin-left:8px; background:transparent; }
+#td-profile-layout-bar button { display:inline-flex; align-items:center; justify-content:center; width:29px; height:29px; padding:0; font-size:18px; line-height:1; }
+#td-profile-layout-bar button[hidden] { display:none !important; }
+#td-profile-layout-bar button[aria-pressed="true"] { box-shadow:0 0 0 2px var(--td-accent); }
+@media (max-width:800px) { #content .row.td-profile-grid { grid-template-columns:minmax(0,1fr); } #content .td-profile-grid > .col-xs-8 { grid-column:1 / -1 !important; order:0; } }
+.title-bar .grow:has(> #td-profile-layout-bar) { display:flex; align-items:center; }
+.td-profile-edit-zone::before { content:attr(data-td-drop-label); display:block; padding:3px 6px; font:600 11px/1.3 Arial,sans-serif; color:var(--td-accent,#315c89); background:color-mix(in srgb,white 85%,var(--td-accent)); }
+#content .td-profile-grid.td-profile-main-empty > .col-xs-8 { display:none; }
+#content .td-profile-grid.td-profile-main-empty.td-profile-columns-1 > [data-td-profile-zone="center"] { grid-column:2; }
+#content .td-profile-grid.td-profile-main-empty.td-profile-columns-1 > .sidebar { grid-column:3; }
+@media (max-width:800px) { #content .td-profile-grid.td-profile-main-empty.td-profile-columns-1 > .sidebar, #content .td-profile-grid.td-profile-main-empty.td-profile-columns-1 > [data-td-profile-zone="center"] { grid-column:1; } }
 `;
     document.head.append(style);
     applyTheme();
