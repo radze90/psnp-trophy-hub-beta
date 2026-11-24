@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.23
+// @version      1.0.24
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.23";
+const APP_VERSION = "1.0.24";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -2051,7 +2051,7 @@ function scheduleProfileGrid() {
     });
 }
 
-const PROFILE_EDIT_GAME_LIMIT = 25;
+const PROFILE_EDIT_GAME_LIMIT = 15;
 function updateProfileGamePreview(section) {
     if (!section) return;
     for (const table of section.querySelectorAll('#gamesTable, #search-results')) {
@@ -2104,12 +2104,10 @@ function applyProfileLayout() {
         if (section.nextElementSibling !== anchor) areas.grid.insertBefore(section, anchor);
         anchor = section;
     }
-    const visible = new Set(items.filter(item => sections[item.id] && !sections[item.id].hidden).map(item => item.id));
-    const placement = packProfileRows(items, visible);
     for (const item of items) {
-        const section = sections[item.id], position = placement.get(item.id);
-        if (!section || !position) continue;
-        section.style.gridColumn = (position.col + 1) + ' / span ' + item.span;
+        const section = sections[item.id];
+        if (!section || section.hidden) continue;
+        section.style.gridColumn = (item.col + 1) + ' / span ' + item.span;
         section.style.gridRowStart = 'auto';
         if (!section.style.gridRowEnd) section.style.gridRowEnd = 'span 1';
     }
@@ -2141,7 +2139,7 @@ function resizeProfileSection(items, id, span, visibleIds) {
     const before = packProfileRows(next, visibleIds), position = before.get(id);
     const selected = next[index];
     selected.span = id === 'games' ? Math.max(2, Math.min(3, span)) : Math.max(1, Math.min(3, span));
-    selected.col = Math.min(position ? position.col : selected.col, 3 - selected.span);
+    selected.col = Math.min(selected.col, 3 - selected.span);
     const trial = packProfileRows(next, visibleIds).get(id);
     if (position && trial && trial.row !== position.row) {
         const rowStart = next.findIndex(entry => before.get(entry.id)?.row === position.row);
@@ -2154,17 +2152,20 @@ function resizeProfileSection(items, id, span, visibleIds) {
 
 function swapGamesInRow(items, visibleIds) {
     const next = items.map(item => ({...item}));
-    const positions = packProfileRows(next, visibleIds), position = positions.get('games');
     const game = next.find(item => item.id === 'games');
-    if (!game || !position || game.span !== 2) return next;
-    const other = next.find(item => item.id !== 'games' && positions.get(item.id)?.row === position.row);
-    const right = position.col === 0;
-    game.col = right ? 1 : 0;
-    if (other) {
-        other.col = right ? 0 : 2;
-        const otherIndex = next.indexOf(other); next.splice(otherIndex, 1);
-        const gameIndex = next.indexOf(game); next.splice(right ? gameIndex : gameIndex + 1, 0, other);
+    if (!game || game.span !== 2) return next;
+    const areas = profileLayoutAreas();
+    const elements = new Map(areas ? Array.from(areas.grid.children).filter(element => element.dataset.tdProfileSection).map(element => [element.dataset.tdProfileSection, element]) : []);
+    const gameElement = elements.get('games');
+    const gameBounds = gameElement && gameElement.getBoundingClientRect();
+    const right = game.col === 0;
+    const sourceColumn = right ? 2 : 0;
+    for (const item of next) {
+        if (item.id === 'games' || item.span !== 1 || item.col !== sourceColumn || !visibleIds.has(item.id)) continue;
+        const element = elements.get(item.id), bounds = element && element.getBoundingClientRect();
+        if (!gameBounds || !bounds || (bounds.top < gameBounds.top + gameBounds.height && bounds.top + bounds.height > gameBounds.top)) item.col = right ? 0 : 2;
     }
+    game.col = right ? 1 : 0;
     return next;
 }
 
@@ -2264,8 +2265,7 @@ function updateProfileSectionControls(section, item) {
         if (item.id === 'games') {
             const align = make('button', '', 'td-profile-align'); align.type = 'button';
             align.addEventListener('click', () => saveProfileLayout(swapGamesInRow(readProfileLayout(), visibleProfileIds())));
-            const preview = make('small', t('Max. 25 games'), 'td-profile-preview-label');
-            toolbar.append(handle, title, preview, up, down, align, spanLabel, width, visibility);
+            toolbar.append(handle, title, up, down, align, spanLabel, width, visibility);
         } else toolbar.append(handle, title, up, down, spanLabel, width, visibility);
         section.prepend(toolbar);
     }
@@ -2285,8 +2285,7 @@ function updateProfileSectionControls(section, item) {
     toolbar.querySelector('.td-profile-down').disabled = siblingIndex < 0 || siblingIndex >= siblings.length - 1;
     if (item.id === 'games') {
         const align = toolbar.querySelector('.td-profile-align');
-        const gamePosition = packProfileRows(readProfileLayout(), visibleProfileIds()).get('games');
-        const gameOnRight = gamePosition && gamePosition.col === 1;
+        const gameOnRight = item.col === 1;
         setProfileLayoutIcon(align, gameOnRight ? 'alignLeft' : 'alignRight');
         align.title = gameOnRight ? t('Move games to the left') : t('Move games to the right');
         align.setAttribute('aria-label', align.title); align.disabled = item.span === 3;
@@ -3019,7 +3018,6 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 #content > .td-unified-grid.td-profile-edit-zone .td-profile-game-overflow,
 #content > .td-unified-grid.td-profile-edit-zone #gamesTable #load-more,
 #content > .td-unified-grid.td-profile-edit-zone #gamesTable #table-loading { display:none !important; }
-.td-profile-section-controls .td-profile-preview-label { color:#fff; opacity:.8; white-space:nowrap; font:12px/1.2 Arial,sans-serif; }
 `;
     document.head.append(style);
     applyTheme();
