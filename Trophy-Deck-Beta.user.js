@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.22
+// @version      1.0.23
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.22";
+const APP_VERSION = "1.0.23";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -2035,12 +2035,56 @@ function visibleProfileIds() {
     return new Set(Array.from(areas.grid.children).filter(section => section.dataset.tdProfileSection && !section.hidden).map(section => section.dataset.tdProfileSection));
 }
 
-function scheduleProfileGrid() { /* Whole-row CSS grid adjusts automatically to content size. */ }
+let profileGridObserver = null;
+let profileGridFrame = 0;
+function scheduleProfileGrid() {
+    if (profileGridFrame) return;
+    profileGridFrame = requestAnimationFrame(() => {
+        profileGridFrame = 0;
+        const grid = document.querySelector('[data-td-unified-grid]');
+        if (!grid) return;
+        Array.from(grid.children).forEach(section => {
+            if (!section.dataset.tdProfileSection || section.hidden) return;
+            const span = 'span ' + Math.max(1, Math.ceil(section.getBoundingClientRect().height / 16));
+            if (section.style.gridRowEnd !== span) section.style.gridRowEnd = span;
+        });
+    });
+}
+
+const PROFILE_EDIT_GAME_LIMIT = 25;
+function updateProfileGamePreview(section) {
+    if (!section) return;
+    for (const table of section.querySelectorAll('#gamesTable, #search-results')) {
+        let count = 0;
+        table.querySelectorAll('tr').forEach(row => {
+            if (!row.querySelector('a.title[href*="/trophies/"]')) return;
+            count++;
+            row.classList.toggle('td-profile-game-overflow', profileLayoutEditing && count > PROFILE_EDIT_GAME_LIMIT);
+        });
+    }
+}
+
+// The site's infinite-scroll handler checks nextPage on scroll. Temporarily set it
+// to zero for the duration of that event, without blocking unrelated listeners.
+let profileNextPageRestore = null;
+function pauseProfileAutoloadForScroll() {
+    if (!profileLayoutEditing || profileNextPageRestore || !(window.nextPage > 0)) return;
+    const saved = window.nextPage;
+    window.nextPage = 0;
+    profileNextPageRestore = () => {
+        if (window.nextPage === 0) window.nextPage = saved;
+        profileNextPageRestore = null;
+    };
+    setTimeout(() => { if (profileNextPageRestore) profileNextPageRestore(); }, 0);
+}
+
 
 function applyProfileLayout() {
     const areas = profileLayoutAreas();
     if (!areas) return;
     const sections = collectProfileSections(areas), items = readProfileLayout();
+    if (!profileGridObserver && typeof ResizeObserver !== 'undefined') profileGridObserver = new ResizeObserver(scheduleProfileGrid);
+    updateProfileGamePreview(sections.games);
     for (const item of items) {
         const section = sections[item.id];
         if (!section) continue;
@@ -2048,7 +2092,10 @@ function applyProfileLayout() {
         section.dataset.tdSpan = String(item.span);
 
         if (profileLayoutEditing) updateProfileSectionControls(section, item);
-        if (section.parentElement !== areas.grid) areas.grid.append(section);
+        if (section.parentElement !== areas.grid) {
+            areas.grid.append(section);
+            if (profileGridObserver) profileGridObserver.observe(section);
+        }
     }
     let anchor = null;
     for (const item of items.slice().reverse()) {
@@ -2063,7 +2110,8 @@ function applyProfileLayout() {
         const section = sections[item.id], position = placement.get(item.id);
         if (!section || !position) continue;
         section.style.gridColumn = (position.col + 1) + ' / span ' + item.span;
-        section.style.gridRow = String(position.row + 1);
+        section.style.gridRowStart = 'auto';
+        if (!section.style.gridRowEnd) section.style.gridRowEnd = 'span 1';
     }
     // Keep unrecognized site sections intact, including the flagged notice.
     const hasExtras = [areas.main, areas.sidebar].some(parent => Array.from(parent.children).some(child => !['SCRIPT','STYLE'].includes(child.tagName)));
@@ -2216,7 +2264,8 @@ function updateProfileSectionControls(section, item) {
         if (item.id === 'games') {
             const align = make('button', '', 'td-profile-align'); align.type = 'button';
             align.addEventListener('click', () => saveProfileLayout(swapGamesInRow(readProfileLayout(), visibleProfileIds())));
-            toolbar.append(handle, title, up, down, align, spanLabel, width, visibility);
+            const preview = make('small', t('Max. 25 games'), 'td-profile-preview-label');
+            toolbar.append(handle, title, preview, up, down, align, spanLabel, width, visibility);
         } else toolbar.append(handle, title, up, down, spanLabel, width, visibility);
         section.prepend(toolbar);
     }
@@ -2251,6 +2300,7 @@ function setProfileLayoutEditing(editing) {
     const areas = profileLayoutAreas();
     if (!areas) { tdDialog(t('Profile layout'), [], t('Open a profile page to arrange its sections.')); return false; }
     profileLayoutEditing = editing;
+    if (!editing && profileNextPageRestore) profileNextPageRestore();
     document.querySelectorAll('[data-td-layout-controls]').forEach(bar => {
         const button = bar.querySelector('.td-profile-layout-edit');
         setProfileLayoutIcon(button, editing ? 'done' : 'edit');
@@ -2962,6 +3012,14 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 #content > .td-unified-grid > .td-profile-section { padding-bottom:0; }
 #content > .td-unified-grid [data-td-profile-section="milestones"] > .title { margin-top:0 !important; }
 .td-profile-section-controls .td-profile-span-label { color:#fff; background:color-mix(in srgb,var(--td-accent) 70%,black); border-radius:3px; padding:4px 6px; font:bold 12px/1 Arial,sans-serif; white-space:nowrap; }
+
+/* Independent column heights; edit mode shows only a short game preview. */
+#content > .td-unified-grid { grid-auto-rows:16px; grid-auto-flow:row dense; row-gap:0; }
+#content > .td-unified-grid > .td-profile-section { padding-bottom:10px; }
+#content > .td-unified-grid.td-profile-edit-zone .td-profile-game-overflow,
+#content > .td-unified-grid.td-profile-edit-zone #gamesTable #load-more,
+#content > .td-unified-grid.td-profile-edit-zone #gamesTable #table-loading { display:none !important; }
+.td-profile-section-controls .td-profile-preview-label { color:#fff; opacity:.8; white-space:nowrap; font:12px/1.2 Arial,sans-serif; }
 `;
     document.head.append(style);
     applyTheme();
@@ -2980,6 +3038,7 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
     });
     layoutObserver.observe(document.body, {childList:true, subtree:true});
     setupScrollControls();
+    window.addEventListener('scroll', pauseProfileAutoloadForScroll, {capture:true, passive:true});
     window.addEventListener('scroll',applyRailPosition,{passive:true});
     window.addEventListener('resize',()=>{
             const rail=document.getElementById('trophydeck-rail');
