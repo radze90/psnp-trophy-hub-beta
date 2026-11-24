@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.13
+// @version      1.0.14
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.13";
+const APP_VERSION = "1.0.14";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -376,6 +376,11 @@ function openSettings() {
         dialog.append(section);
     });
 
+    const layoutButton = make('button', t('Arrange profile sections'), 'epic-button');
+    layoutButton.type = 'button';
+    layoutButton.addEventListener('click', openProfileLayout);
+    sections.profile.append(make('small', t('Arrange, show or hide the sections of profile pages.'), 'epic-muted'), layoutButton);
+
     const languageLabel = make('label', t("Language") + ': ', 'epic-width');
     const languageSelect = make('select');
     const autoLanguage = make('option', t("Automatic (browser language)"));
@@ -702,6 +707,7 @@ function openFeatureGuide() {
                 [t("Size and behavior"), t("Under Settings → Trophy Deck, adjust the side, width, height, position and scrolling behavior, or restore defaults.")]
             ]],
         [t("On profile and game pages"), [
+                [t("Profile layout"), t("In Settings → Profile page → Arrange profile sections, reorder sections, choose their column and toggle visibility. The layout applies to all profiles in this browser.")],
                 [t("Game notes"), t("Click the note below a game or on its trophy page. Text is saved locally as you type; clicking outside closes the editor. Web links are clickable.")],
                 [t("Game cabinet"), t("Use the star beside a game to save it to the displayed profile’s cabinet. Hover over its cover to reveal the remove button.")],
                 [t("Profile navigation"), t("Optionally keep the upper navigation with Profile, Trophy Log and Stats visible while scrolling.")]
@@ -1731,13 +1737,15 @@ function updateGameCabinet() {
         if(!sidebar){
             return;
         }
-        let container=sidebar.querySelector('[data-td-cabinet]');
+        let container=document.querySelector('[data-td-cabinet]');
         const anchor=Array.from(sidebar.querySelectorAll('div.title h3')).find(h=>h.textContent.trim()==='Trophy Cabinet');
         if(!container){
             container=make('section',null,'td-game-cabinet');
             container.dataset.tdCabinet='true';
             if(anchor){
-                anchor.closest('div.title').before(container);
+                const title = anchor.closest('div.title');
+                const section = title.closest('[data-td-profile-section]');
+                (section && section.parentElement === sidebar ? section : title).before(container);
             }else {
                 sidebar.prepend(container);
             }
@@ -1884,6 +1892,176 @@ function enableRailDragging(header) {
             header.addEventListener('pointerup',stop);
             header.addEventListener('pointercancel',stop);
         });
+}
+
+
+// Profile layout is stored independently of PSNProfiles and PSNP+ settings.
+const profileLayoutDefinitions = [
+    {id:'recent', label:'Recent trophies', zone:'top'},
+    {id:'games', label:'Games list', zone:'main'},
+    {id:'gameCabinet', label:'Game cabinet', zone:'sidebar'},
+    {id:'scanned', label:'Scanned games', zone:'sidebar'},
+    {id:'trophyCabinet', label:'Trophy cabinet', zone:'sidebar'},
+    {id:'rarest', label:'Rarest trophies', zone:'sidebar'},
+    {id:'milestones', label:'Trophy milestones', zone:'sidebar'}
+];
+const profileLayoutKey = 'trophydeck.profileLayout';
+
+function readProfileLayout() {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(profileLayoutKey) || '{}') || {}; } catch (_) {}
+    const items = Array.isArray(saved.items) ? saved.items : [];
+    const known = new Set(profileLayoutDefinitions.map(item => item.id));
+    const order = [...new Set(items.map(item => item && item.id).filter(id => known.has(id)))];
+    profileLayoutDefinitions.forEach(item => { if (!order.includes(item.id)) order.push(item.id); });
+    return order.map(id => {
+        const definition = profileLayoutDefinitions.find(item => item.id === id);
+        const previous = items.find(item => item && item.id === id) || {};
+        return {id, zone:['top','main','sidebar'].includes(previous.zone) ? previous.zone : definition.zone, hidden:previous.hidden === true};
+    });
+}
+
+function saveProfileLayout(items) {
+    localStorage.setItem(profileLayoutKey, JSON.stringify({version:1, items}));
+    logEvent('profileLayout.change');
+    applyProfileLayout();
+}
+
+function profileLayoutAreas() {
+    const profile = profileInfo();
+    if (!profile || location.pathname.replace(/\/$/, '').toLowerCase() !== profile.path.toLowerCase()) return null;
+    const content = document.querySelector('#content');
+    const sidebar = content && content.querySelector('.row > .sidebar');
+    const main = sidebar && sidebar.parentElement.querySelector(':scope > .col-xs-8');
+    if (!content || !sidebar || !main) return null;
+    const row = sidebar.parentElement;
+    let top = content.querySelector(':scope > [data-td-profile-zone="top"]');
+    if (!top) {
+        top = make('div', null, 'td-profile-top');
+        top.dataset.tdProfileZone = 'top';
+        row.before(top);
+    }
+    return {content, top, main, sidebar};
+}
+
+function collectProfileSections(areas) {
+    const {content, top, main, sidebar} = areas;
+    const sections = {};
+    content.querySelectorAll('[data-td-profile-section]').forEach(element => { sections[element.dataset.tdProfileSection] = element; });
+    if (!sections.recent) {
+        const recent = content.querySelector('#recent-trophies');
+        if (recent) {
+            const wrapper = make('div', null, 'td-profile-section');
+            wrapper.dataset.tdProfileSection = 'recent';
+            recent.before(wrapper); wrapper.append(recent); sections.recent = wrapper;
+        }
+    }
+    if (!sections.games) {
+        const heading = Array.from(main.querySelectorAll(':scope > .title h3')).find(node => /^games(?:\s*\([^)]*\))?$/i.test(node.textContent.trim()));
+        if (heading) {
+            const wrapper = make('div', null, 'td-profile-section');
+            wrapper.dataset.tdProfileSection = 'games';
+            while (main.firstChild) wrapper.append(main.firstChild);
+            main.append(wrapper); sections.games = wrapper;
+        }
+    }
+    const cabinet = content.querySelector('[data-td-cabinet]');
+    if (cabinet && !sections.gameCabinet) {
+        cabinet.dataset.tdProfileSection = 'gameCabinet';
+        cabinet.classList.add('td-profile-section');
+        sections.gameCabinet = cabinet;
+    }
+    const titles = {'scanned games':'scanned','trophy cabinet':'trophyCabinet','rarest trophies':'rarest','rarest unique trophies':'rarest','trophy milestones':'milestones'};
+    Array.from(sidebar.querySelectorAll(':scope > .title h3')).forEach(heading => {
+        const id = titles[heading.textContent.trim().toLowerCase().replace(/\s*\([^)]*\)$/, '')];
+        const title = heading.closest('.title');
+        const box = title && title.nextElementSibling;
+        if (!id || sections[id] || !box || !box.matches('.box')) return;
+        const wrapper = make('div', null, 'td-profile-section');
+        wrapper.dataset.tdProfileSection = id;
+        title.before(wrapper); wrapper.append(title, box); sections[id] = wrapper;
+    });
+    return sections;
+}
+
+function applyProfileLayout() {
+    const areas = profileLayoutAreas();
+    if (!areas) return;
+    const sections = collectProfileSections(areas);
+    const items = readProfileLayout();
+    for (const item of items) if (sections[item.id]) sections[item.id].hidden = item.hidden;
+    // Preserve the site's exact original order until the user changes the layout.
+    if (!localStorage.getItem(profileLayoutKey)) return;
+    for (const zone of ['top','main','sidebar']) {
+        const target = areas[zone];
+        let anchor = null;
+        for (const item of items.filter(entry => entry.zone === zone).reverse()) {
+            const section = sections[item.id];
+            if (!section) continue;
+            if (section.parentElement !== target || section.nextElementSibling !== anchor) target.insertBefore(section, anchor);
+            anchor = section;
+        }
+    }
+}
+
+function openProfileLayout() {
+    if (document.getElementById('td-profile-layout')) return;
+    const areas = profileLayoutAreas();
+    if (!areas) { tdDialog(t('Profile layout'), [], t('Open a profile page to arrange its sections.')); return; }
+    const dialog = make('dialog', null, 'td-dialog td-profile-layout-dialog');
+    dialog.id = 'td-profile-layout';
+    const heading = make('h2', t('Profile layout'));
+    const close = make('button', '×', 'td-dialog-close');
+    close.type = 'button'; close.title = t('Close'); close.setAttribute('aria-label', t('Close'));
+    close.addEventListener('click', () => dialog.close());
+    heading.append(close); dialog.append(heading);
+    dialog.append(make('p', t('Choose a position, reorder sections and show or hide them. Changes apply to all profiles in this browser.'), 'epic-muted'));
+    const list = make('div', null, 'td-profile-layout-list'); dialog.append(list);
+    let items = readProfileLayout();
+    let dragging = null;
+    function draw() {
+        list.replaceChildren();
+        const available = collectProfileSections(areas);
+        items.forEach((item, index) => {
+            const definition = profileLayoutDefinitions.find(entry => entry.id === item.id);
+            const row = make('div', null, 'td-profile-layout-row');
+            row.draggable = true;
+            row.addEventListener('dragstart', event => { dragging = item.id; row.classList.add('td-layout-dragging'); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', item.id); });
+            row.addEventListener('dragend', () => { dragging = null; row.classList.remove('td-layout-dragging'); });
+            row.addEventListener('dragover', event => { if (dragging && dragging !== item.id) { event.preventDefault(); row.classList.add('td-layout-target'); } });
+            row.addEventListener('dragleave', () => row.classList.remove('td-layout-target'));
+            row.addEventListener('drop', event => {
+                event.preventDefault(); row.classList.remove('td-layout-target');
+                const from = items.findIndex(entry => entry.id === dragging), to = items.findIndex(entry => entry.id === item.id);
+                if (from < 0 || to < 0 || from === to) return;
+                const [moved] = items.splice(from, 1); items.splice(to, 0, moved); dragging = null; saveProfileLayout(items); draw();
+            });
+            const label = make('label', null, 'td-profile-layout-name');
+            const visible = make('input'); visible.type = 'checkbox'; visible.checked = !item.hidden;
+            visible.addEventListener('change', () => { item.hidden = !visible.checked; saveProfileLayout(items); });
+            label.append(visible, make('span', t(definition.label)));
+            if (!available[item.id]) label.append(make('small', t('Not available on this profile'), 'epic-muted'));
+            const position = make('select'); position.setAttribute('aria-label', t('Position') + ': ' + t(definition.label));
+            [['top','Above the columns'], ['main','Main column'], ['sidebar','Side column']].forEach(([value, text]) => { const option = make('option', t(text)); option.value = value; position.append(option); });
+            position.value = item.zone;
+            position.addEventListener('change', () => { item.zone = position.value; saveProfileLayout(items); });
+            const controls = make('span', null, 'td-profile-layout-controls');
+            [['↑',-1,'Move section up'],['↓',1,'Move section down']].forEach(([symbol, offset, name]) => {
+                const button = make('button', symbol, 'epic-button'); button.type = 'button'; button.title = t(name); button.setAttribute('aria-label', t(name) + ': ' + t(definition.label));
+                button.disabled = index + offset < 0 || index + offset >= items.length;
+                button.addEventListener('click', () => { [items[index],items[index+offset]] = [items[index+offset],items[index]]; saveProfileLayout(items); draw(); });
+                controls.append(button);
+            });
+            row.append(label, position, controls); list.append(row);
+        });
+    }
+    draw();
+    const reset = make('button', t('Restore profile layout'), 'epic-button'); reset.type = 'button';
+    reset.addEventListener('click', () => { items = profileLayoutDefinitions.map(({id,zone}) => ({id,zone,hidden:false})); saveProfileLayout(items); draw(); });
+    dialog.append(reset); document.body.append(dialog);
+    dialog.addEventListener('close', () => dialog.remove());
+    dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+    dialog.showModal();
 }
 
 
@@ -2364,6 +2542,23 @@ html.trophydeck-psnp-colors a.scroll-top { background-color:var(--td-accent) !im
 .td-manager-list { min-width:0; overflow-x:hidden; }
 
 .trophydeck-game-note[hidden] { display:none !important; }
+/* Profile layout manager */
+.td-profile-section[hidden] { display:none !important; }
+.td-profile-section { min-width:0; }
+.td-profile-layout-dialog { width:min(780px,94vw); }
+.td-profile-layout-list { display:grid; gap:6px; margin:14px 0; }
+.td-profile-layout-row { display:flex; align-items:center; gap:10px; padding:8px; border:1px solid var(--td-accent); border-radius:4px; background:var(--td-card); cursor:grab; }
+.td-profile-layout-row.td-layout-dragging { opacity:.45; }
+.td-profile-layout-row.td-layout-target { outline:2px solid var(--td-accent); }
+.td-profile-layout-dialog .td-profile-layout-name { display:flex; flex:1; align-items:center; gap:8px; flex-wrap:wrap; margin:0; min-width:0; }
+.td-profile-layout-dialog .td-profile-layout-name input { display:inline-block; width:auto; margin:0; }
+.td-profile-layout-name small { width:100%; padding-left:21px; }
+.td-profile-layout-row select { max-width:42%; padding:6px; border-radius:4px; }
+.td-profile-layout-controls { display:flex; gap:3px; }
+.td-profile-layout-dialog .td-profile-layout-controls button { margin:0; padding:5px 9px; }
+.td-profile-layout-controls button:disabled { opacity:.4; cursor:default; }
+@media (max-width:600px) { .td-profile-layout-row { flex-wrap:wrap; } .td-profile-layout-name { flex-basis:100% !important; } }
+.trophydeck-psnp-colors .td-profile-section > div.title:not(.red) { background:var(--td-accent) !important; }
 `;
     document.head.append(style);
     applyTheme();
@@ -2372,6 +2567,14 @@ html.trophydeck-psnp-colors a.scroll-top { background-color:var(--td-accent) !im
     updateGameNotes();
     updateStickyNav();
     updateGameCabinet();
+    applyProfileLayout();
+    let layoutPending = false;
+    const layoutObserver = new MutationObserver(records => {
+        if (layoutPending || !records.some(record => record.addedNodes.length)) return;
+        layoutPending = true;
+        requestAnimationFrame(() => { layoutPending = false; applyProfileLayout(); });
+    });
+    layoutObserver.observe(document.body, {childList:true, subtree:true});
     setupScrollControls();
     window.addEventListener('scroll',applyRailPosition,{passive:true});
     window.addEventListener('resize',()=>{
