@@ -266,5 +266,6 @@ var __trophyDeckLocale_en = {
   "Restore profile layout": "Restore profile layout",
   "Arrange profile sections": "Arrange profile sections",
   "Arrange, show or hide the sections of profile pages.": "Arrange, show or hide the sections of profile pages.",
-  "In Settings → Profile page → Arrange profile sections, reorder sections, choose their column and toggle visibility. The layout applies to all profiles in this browser.": "In Settings → Profile page → Arrange profile sections, reorder sections, choose their column and toggle visibility. The layout applies to all profiles in this browser."
+  "In Settings → Profile page → Arrange profile sections, reorder sections, choose their column and toggle visibility. The layout applies to all profiles in this browser.": "In Settings → Profile page → Arrange profile sections, reorder sections, choose their column and toggle visibility. The layout applies to all profiles in this browser.",
+  "Profile update status": "Profile update status"
 };

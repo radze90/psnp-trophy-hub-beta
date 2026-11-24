@@ -266,5 +266,6 @@ var __trophyDeckLocale_de = {
   "Restore profile layout": "Profilanordnung zurücksetzen",
   "Arrange profile sections": "Profilbereiche anordnen",
   "Arrange, show or hide the sections of profile pages.": "Bereiche auf Profilseiten anordnen, ein- oder ausblenden.",
-  "In Settings → Profile page → Arrange profile sections, reorder sections, choose their column and toggle visibility. The layout applies to all profiles in this browser.": "Unter Einstellungen → Profilseite → Profilbereiche anordnen lassen sich Bereiche sortieren, einer Spalte zuweisen und ein- oder ausblenden. Die Anordnung gilt für alle Profile in diesem Browser."
+  "In Settings → Profile page → Arrange profile sections, reorder sections, choose their column and toggle visibility. The layout applies to all profiles in this browser.": "Unter Einstellungen → Profilseite → Profilbereiche anordnen lassen sich Bereiche sortieren, einer Spalte zuweisen und ein- oder ausblenden. Die Anordnung gilt für alle Profile in diesem Browser.",
+  "Profile update status": "Profil-Aktualisierung"
 };

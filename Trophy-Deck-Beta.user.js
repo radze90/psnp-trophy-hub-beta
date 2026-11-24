@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.14
+// @version      1.0.15
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.14";
+const APP_VERSION = "1.0.15";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -1903,7 +1903,8 @@ const profileLayoutDefinitions = [
     {id:'scanned', label:'Scanned games', zone:'sidebar'},
     {id:'trophyCabinet', label:'Trophy cabinet', zone:'sidebar'},
     {id:'rarest', label:'Rarest trophies', zone:'sidebar'},
-    {id:'milestones', label:'Trophy milestones', zone:'sidebar'}
+    {id:'milestones', label:'Trophy milestones', zone:'sidebar'},
+    {id:'updateInfo', label:'Profile update status', zone:'sidebar'}
 ];
 const profileLayoutKey = 'trophydeck.profileLayout';
 
@@ -1981,6 +1982,17 @@ function collectProfileSections(areas) {
         wrapper.dataset.tdProfileSection = id;
         title.before(wrapper); wrapper.append(title, box); sections[id] = wrapper;
     });
+    if (!sections.updateInfo) {
+        const status = Array.from(sidebar.querySelectorAll(':scope > span.floatr')).find(element => {
+            const small = element.querySelector('small');
+            return small && /^updated\b/i.test(small.textContent.trim());
+        });
+        if (status) {
+            const wrapper = make('div', null, 'td-profile-section td-profile-update');
+            wrapper.dataset.tdProfileSection = 'updateInfo';
+            status.before(wrapper); wrapper.append(status); sections.updateInfo = wrapper;
+        }
+    }
     return sections;
 }
 
@@ -2559,6 +2571,9 @@ html.trophydeck-psnp-colors a.scroll-top { background-color:var(--td-accent) !im
 .td-profile-layout-controls button:disabled { opacity:.4; cursor:default; }
 @media (max-width:600px) { .td-profile-layout-row { flex-wrap:wrap; } .td-profile-layout-name { flex-basis:100% !important; } }
 .trophydeck-psnp-colors .td-profile-section > div.title:not(.red) { background:var(--td-accent) !important; }
+
+/* Keep the floated update timestamp below the preceding profile section. */
+.td-profile-update { display:flow-root; clear:both; }
 `;
     document.head.append(style);
     applyTheme();
