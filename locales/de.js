@@ -288,5 +288,8 @@ var __trophyDeckLocale_de = {
   "Use the edit icon beside the profile name. Drag small sections into the left, middle or right column; use the width icon for full width. The reset icon appears while editing.": "Verwende das Bearbeitungssymbol neben dem Profilnamen. Ziehe kleine Bereiche in die linke, mittlere oder rechte Spalte; mit dem Breitensymbol schaltest du auf volle Breite. Das Zurücksetzen-Symbol erscheint während der Bearbeitung.",
   "Recent trophies always use full width": "Die letzten Trophäen bleiben immer in voller Breite",
   "Upper area": "Oberer Bereich",
-  "Lower area": "Unterer Bereich"
+  "Lower area": "Unterer Bereich",
+  "Change section width": "Breite des Bereichs ändern",
+  "Move games to the right": "Spiele nach rechts setzen",
+  "Move games to the left": "Spiele nach links setzen"
 };
