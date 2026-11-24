@@ -285,5 +285,8 @@ var __trophyDeckLocale_en = {
   "Middle column": "Middle column",
   "Right column": "Right column",
   "Full width · bottom": "Full width · bottom",
-  "Use the edit icon beside the profile name. Drag small sections into the left, middle or right column; use the width icon for full width. The reset icon appears while editing.": "Use the edit icon beside the profile name. Drag small sections into the left, middle or right column; use the width icon for full width. The reset icon appears while editing."
+  "Use the edit icon beside the profile name. Drag small sections into the left, middle or right column; use the width icon for full width. The reset icon appears while editing.": "Use the edit icon beside the profile name. Drag small sections into the left, middle or right column; use the width icon for full width. The reset icon appears while editing.",
+  "Recent trophies always use full width": "Recent trophies always use full width",
+  "Upper area": "Upper area",
+  "Lower area": "Lower area"
 };

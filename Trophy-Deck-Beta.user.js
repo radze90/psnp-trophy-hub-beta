@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.18
+// @version      1.0.19
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.18";
+const APP_VERSION = "1.0.19";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -903,12 +903,15 @@ function updateStickyNav() {
         const title = make('h3', heading.textContent.trim());
         copyTypography(heading, title);
         title.style.margin = '0';
-        sticky.append(title);
+        const titleGroup = make('div', null, 'td-sticky-title');
+        titleGroup.append(title);
+        sticky.append(titleGroup);
     }
     const links = make('nav');
     links.setAttribute('aria-label', t("Profile navigation"));
     sticky.append(links);
     document.body.append(sticky);
+    setupProfileLayoutEditor();
     function sync() {
         if (!sticky.isConnected) {
             return;
@@ -1921,7 +1924,12 @@ function readProfileLayout() {
     return order.map(id => {
         const definition = profileLayoutDefinitions.find(item => item.id === id);
         const previous = items.find(item => item && item.id === id) || {};
-        return {id, zone:['top','main','left','center','sidebar','bottom'].includes(previous.zone) ? (id === 'games' && ['left','center','sidebar'].includes(previous.zone) ? 'main' : (id !== 'games' && previous.zone === 'main' ? 'left' : previous.zone)) : definition.zone, hidden:previous.hidden === true, restoreZone:(id === 'games' ? 'main' : (['left','center','sidebar'].includes(previous.restoreZone) ? previous.restoreZone : 'sidebar'))};
+        let zone = ['top','main','left','center','sidebar','bottom'].includes(previous.zone) ? previous.zone : definition.zone;
+        if (id === 'games' && ['left','center','sidebar'].includes(zone)) zone = 'main';
+        if (id === 'recent' && !['top','bottom'].includes(zone)) zone = 'top';
+        if (id !== 'games' && id !== 'recent' && zone === 'main') zone = 'left';
+        const full = id === 'recent' || id === 'games' && ['top','bottom'].includes(zone) || (typeof previous.full === 'boolean' ? previous.full : ['top','bottom'].includes(zone));
+        return {id, zone, full, hidden:previous.hidden === true, restoreZone:(id === 'games' ? 'main' : (['left','center','sidebar'].includes(previous.restoreZone) ? previous.restoreZone : 'sidebar'))};
     });
 }
 
@@ -2015,6 +2023,7 @@ function applyProfileLayout() {
     const items = readProfileLayout();
     for (const item of items) if (sections[item.id]) {
         sections[item.id].hidden = item.hidden && !profileLayoutEditing;
+        sections[item.id].classList.toggle('td-profile-is-wide', item.full || item.id === 'recent' || item.id === 'games');
         if (profileLayoutEditing) updateProfileSectionControls(sections[item.id], item);
     }
     // Preserve the site's exact original order until the user changes the layout.
@@ -2041,8 +2050,8 @@ function syncProfileGrid(areas) {
     for (const zone of smallZones) {
         const container = areas[zone];
         const occupied = Array.from(container.children).some(child => !child.hidden && (!child.dataset.tdProfileSection || child.classList.contains('td-profile-section')));
-        container.classList.toggle('td-profile-zone-empty', !occupied && !profileLayoutEditing);
-        if (occupied || profileLayoutEditing) count++;
+        container.classList.toggle('td-profile-zone-empty', !occupied);
+        if (occupied) count++;
     }
     for (let number = 0; number <= 3; number++) areas.row.classList.toggle('td-profile-columns-' + number, number === count);
 }
@@ -2050,8 +2059,9 @@ function syncProfileGrid(areas) {
 // Reorder data separately from the DOM, so absent and hidden sections remain intact.
 function canDropProfileSection(item, zone) {
     if (item.id === 'games') return zone === 'main' || (['top','bottom'].includes(item.zone) && ['top','bottom'].includes(zone));
-    if (['top','bottom'].includes(item.zone)) return ['top','bottom'].includes(zone);
-    return ['left','center','sidebar'].includes(zone);
+    if (item.id === 'recent') return ['top','bottom'].includes(zone);
+    if (item.full) return ['top','bottom'].includes(zone);
+    return ['left','center','sidebar','top','bottom'].includes(zone);
 }
 
 function moveProfileSection(items, id, zone, targetId, after = false) {
@@ -2063,6 +2073,7 @@ function moveProfileSection(items, id, zone, targetId, after = false) {
     if (source < 0 || id === targetId) return next;
     const [moved] = next.splice(source, 1);
     moved.zone = zone;
+    if (['left','center','sidebar'].includes(zone)) { moved.full = false; moved.restoreZone = zone; }
     const target = next.findIndex(item => item.id === targetId && item.zone === zone);
     if (target >= 0) next.splice(target + (after ? 1 : 0), 0, moved);
     else {
@@ -2121,7 +2132,8 @@ function updateProfileSectionControls(section, item) {
     let toolbar = section.querySelector(':scope > .td-profile-section-controls');
     if (!toolbar) {
         toolbar = make('div', null, 'td-profile-section-controls');
-        const handle = make('button', '⋮⋮', 'td-profile-drag');
+        const handle = make('button', '', 'td-profile-drag');
+        setProfileLayoutIcon(handle, 'drag');
         handle.type = 'button'; handle.draggable = true;
         handle.title = t('Drag to move this section');
         handle.setAttribute('aria-label', t('Drag section to reorder'));
@@ -2156,24 +2168,25 @@ function updateProfileSectionControls(section, item) {
             });
             return button;
         }
-        const up = moveButton('↑', -1, 'Move section up');
-        const down = moveButton('↓', 1, 'Move section down');
+        const up = moveButton('', -1, 'Move section up'); setProfileLayoutIcon(up, 'up');
+        const down = moveButton('', 1, 'Move section down'); setProfileLayoutIcon(down, 'down');
         const width = make('button', '', 'td-profile-width'); width.type = 'button';
         width.addEventListener('click', () => {
             const items = readProfileLayout();
             const current = items.find(entry => entry.id === section.dataset.tdProfileSection);
             if (!current) return;
-            if (['top','bottom'].includes(current.zone)) current.zone = current.id === 'games' ? 'main' : current.restoreZone;
-            else { current.restoreZone = current.zone; current.zone = 'top'; }
+            if (current.id === 'recent') return;
+            if (current.full) { current.zone = current.restoreZone; current.full = false; }
+            else { if (['main','left','center','sidebar'].includes(current.zone)) current.restoreZone = current.zone; current.zone = 'top'; current.full = true; }
             saveProfileLayout(items);
         });
         toolbar.append(handle, title, up, down, width, visibility); section.prepend(toolbar);
     }
     const width = toolbar.querySelector('.td-profile-width');
-    const wide = ['top','bottom'].includes(item.zone);
-    const widthText = wide ? '⊟' : '⛶';
-    if (width.textContent !== widthText) width.textContent = widthText;
-    width.title = wide ? t('Restore section width') : t('Expand section to full width');
+    const wide = item.full;
+    width.disabled = item.id === 'recent';
+    setProfileLayoutIcon(width, wide ? 'shrink' : 'expand');
+    width.title = item.id === 'recent' ? t('Recent trophies always use full width') : (wide ? t('Restore section width') : t('Expand section to full width'));
     width.setAttribute('aria-label', width.title + ': ' + t(profileLayoutDefinitions.find(entry => entry.id === item.id).label));
     width.setAttribute('aria-pressed', String(wide));
     const visibility = toolbar.querySelector('.td-profile-visibility');
@@ -2181,8 +2194,7 @@ function updateProfileSectionControls(section, item) {
     const siblingIndex = siblings.indexOf(section);
     toolbar.querySelector('.td-profile-up').disabled = siblingIndex <= 0;
     toolbar.querySelector('.td-profile-down').disabled = siblingIndex < 0 || siblingIndex >= siblings.length - 1;
-    const visibilityText = item.hidden ? '⊘' : '◉';
-    if (visibility.textContent !== visibilityText) visibility.textContent = visibilityText;
+    setProfileLayoutIcon(visibility, item.hidden ? 'eyeOff' : 'eye');
     visibility.title = item.hidden ? t('Show section') : t('Hide section');
     visibility.setAttribute('aria-label', visibility.title + ': ' + t(profileLayoutDefinitions.find(entry => entry.id === item.id).label));
 }
@@ -2191,18 +2203,17 @@ function setProfileLayoutEditing(editing) {
     const areas = profileLayoutAreas();
     if (!areas) { tdDialog(t('Profile layout'), [], t('Open a profile page to arrange its sections.')); return false; }
     profileLayoutEditing = editing;
-    const bar = document.getElementById('td-profile-layout-bar');
-    if (bar) {
+    document.querySelectorAll('[data-td-layout-controls]').forEach(bar => {
         const button = bar.querySelector('.td-profile-layout-edit');
-        button.textContent = editing ? '✓' : '✎';
+        setProfileLayoutIcon(button, editing ? 'done' : 'edit');
         button.title = editing ? t('Done editing profile layout') : t('Edit profile layout');
         button.setAttribute('aria-label', button.title);
         button.setAttribute('aria-pressed', String(editing));
         bar.querySelector('.td-profile-layout-reset').hidden = !editing;
-    }
+    });
     for (const zone of ['top','main','left','center','sidebar','bottom']) {
         areas[zone].classList.toggle('td-profile-edit-zone', editing);
-        areas[zone].dataset.tdDropLabel = t(({top:'Full width · top', main:'Games area', left:'Left column', center:'Middle column', sidebar:'Right column', bottom:'Full width · bottom'})[zone]);
+        areas[zone].dataset.tdDropLabel = t(({top:'Upper area', main:'Games area', left:'Left column', center:'Middle column', sidebar:'Right column', bottom:'Lower area'})[zone]);
         installProfileDropZone(areas[zone], zone);
     }
     if (!editing) {
@@ -2215,23 +2226,49 @@ function setProfileLayoutEditing(editing) {
     return true;
 }
 
+const profileLayoutIcons = {
+    edit: 'M12 20h9 M16.5 3.5a2.12 2.12 0 013 3L8 18l-4 1 1-4z',
+    done: 'M5 12l5 5L20 6', reset: 'M3 12a9 9 0 1 0 3-6.7 M3 3v6h6',
+    drag: 'M9 5h.01 M15 5h.01 M9 12h.01 M15 12h.01 M9 19h.01 M15 19h.01',
+    up: 'M6 14l6-6 6 6', down: 'M6 10l6 6 6-6',
+    expand: 'M4 9V4h5 M15 4h5v5 M20 15v5h-5 M9 20H4v-5',
+    shrink: 'M4 9h5V4 M15 4v5h5 M20 15h-5v5 M9 20v-5H4',
+    eye: 'M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+    eyeOff: 'M3 3l18 18 M10 6.2A11 11 0 0 1 12 6c6.5 0 10 6 10 6a14 14 0 0 1-3 3.4 M6.4 6.4A15 15 0 0 0 2 12s3.5 6 10 6c1.4 0 2.6-.3 3.7-.7'
+};
+function setProfileLayoutIcon(button, name) {
+    if (button.dataset.tdIcon === name) return;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2'); svg.setAttribute('stroke-linecap', 'round'); svg.setAttribute('stroke-linejoin', 'round');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', profileLayoutIcons[name]); svg.append(path); button.replaceChildren(svg);
+    button.dataset.tdIcon = name;
+}
+function makeProfileLayoutControls(id) {
+    const bar = make('span', null, 'td-profile-layout-bar');
+    if (id) bar.id = id;
+    bar.dataset.tdLayoutControls = 'true';
+    const button = make('button', '', 'td-profile-layout-edit');
+    button.type = 'button'; button.title = profileLayoutEditing ? t('Done editing profile layout') : t('Edit profile layout');
+    button.setAttribute('aria-label', button.title); button.setAttribute('aria-pressed', String(profileLayoutEditing));
+    setProfileLayoutIcon(button, profileLayoutEditing ? 'done' : 'edit');
+    button.addEventListener('click', () => setProfileLayoutEditing(!profileLayoutEditing));
+    const reset = make('button', '', 'td-profile-layout-reset');
+    reset.type = 'button'; reset.title = t('Restore profile layout'); reset.setAttribute('aria-label', reset.title);
+    reset.hidden = !profileLayoutEditing; setProfileLayoutIcon(reset, 'reset');
+    reset.addEventListener('click', resetProfileLayout); bar.append(button, reset);
+    return bar;
+}
 function setupProfileLayoutEditor() {
     const areas = profileLayoutAreas();
-    if (!areas || document.getElementById('td-profile-layout-bar')) return;
+    if (!areas) return;
     const profile = profileInfo();
-    const titleBar = profile?.nav.closest('.title-bar');
-    const heading = titleBar?.querySelector('h3');
-    if (!heading || !heading.parentElement) return;
-    const bar = make('span', null, 'td-profile-layout-bar'); bar.id = 'td-profile-layout-bar';
-    const button = make('button', '✎', 'td-profile-layout-edit');
-    button.type = 'button'; button.title = t('Edit profile layout');
-    button.setAttribute('aria-label', button.title); button.setAttribute('aria-pressed', 'false');
-    button.addEventListener('click', () => setProfileLayoutEditing(!profileLayoutEditing));
-    const reset = make('button', '↺', 'td-profile-layout-reset');
-    reset.type = 'button'; reset.title = t('Restore profile layout');
-    reset.setAttribute('aria-label', reset.title); reset.hidden = true;
-    reset.addEventListener('click', resetProfileLayout);
-    bar.append(button, reset); heading.parentElement.append(bar);
+    const heading = profile?.nav.closest('.title-bar')?.querySelector('h3');
+    if (heading?.parentElement && !document.getElementById('td-profile-layout-bar')) heading.parentElement.append(makeProfileLayoutControls('td-profile-layout-bar'));
+    const stickyTitle = document.querySelector('#trophydeck-sticky .td-sticky-title');
+    if (stickyTitle && !stickyTitle.querySelector('[data-td-layout-controls]')) stickyTitle.append(makeProfileLayoutControls());
 }
 
 
@@ -2801,6 +2838,42 @@ html.trophydeck-psnp-colors a.scroll-top { background-color:var(--td-accent) !im
 }
 #content .td-profile-section-controls { gap:4px; }
 #content .td-profile-section-controls button:disabled { opacity:.4; cursor:default; }
+/* The floating profile navigation mirrors the editor controls. */
+#trophydeck-sticky .td-sticky-title { display:flex; align-items:center; min-width:0; gap:8px; }
+.td-profile-layout-bar { position:static; display:inline-flex; align-items:center; gap:3px; padding:0; margin-left:8px; background:transparent; vertical-align:middle; }
+.td-profile-layout-bar button, #content .td-profile-section-controls button {
+    display:inline-flex; align-items:center; justify-content:center; flex:0 0 32px;
+    width:32px; min-width:32px; max-width:32px; height:32px; min-height:32px; max-height:32px;
+    margin:0; padding:0; border:0; border-radius:4px; box-sizing:border-box;
+    color:#fff; background:var(--td-accent,#315c89); line-height:1; cursor:pointer;
+}
+.td-profile-layout-bar button[hidden] { display:none !important; }
+.td-profile-layout-bar button svg, #content .td-profile-section-controls button svg { display:block; flex:none; width:18px; height:18px; }
+#content .td-profile-section-controls button:disabled { opacity:.4; cursor:default; }
+/* Empty docking targets overlay the grid during editing without changing its widths. */
+#content .row.td-profile-grid { position:relative; }
+#content .td-profile-grid > .td-profile-zone-empty.td-profile-edit-zone { display:block; position:absolute; z-index:2; top:0; bottom:0; width:22px !important; min-height:48px; padding:0; }
+#content .td-profile-grid > [data-td-profile-zone="left"].td-profile-zone-empty { left:0; }
+#content .td-profile-grid > [data-td-profile-zone="center"].td-profile-zone-empty { left:calc(50% - 11px); }
+#content .td-profile-grid > .sidebar.td-profile-zone-empty { right:0; }
+#content .td-profile-grid > .td-profile-zone-empty.td-profile-edit-zone::before { content:''; }
+/* Narrow sections in the upper/lower area remain tiles; full sections span the row. */
+.td-profile-top, .td-profile-bottom { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); align-items:start; }
+.td-profile-top > .td-profile-section, .td-profile-bottom > .td-profile-section { grid-column:span 1; min-width:0; }
+.td-profile-top > .td-profile-is-wide, .td-profile-bottom > .td-profile-is-wide { grid-column:1 / -1; }
+.td-profile-top.td-profile-edit-zone::before, .td-profile-bottom.td-profile-edit-zone::before { grid-column:1 / -1; }
+.td-profile-section > #recent-trophies { width:100%; max-width:100%; }
+@media (max-width:800px) { .td-profile-top, .td-profile-bottom { grid-template-columns:minmax(0,1fr); } }
+/* Match both copies of the navigation controls despite PSNProfiles button rules. */
+#td-profile-layout-bar button,
+#trophydeck-sticky .td-profile-layout-bar button {
+    display:inline-flex; align-items:center; justify-content:center; flex:0 0 32px;
+    width:32px; min-width:32px; max-width:32px;
+    height:32px; min-height:32px; max-height:32px;
+    padding:0; margin:0; box-sizing:border-box;
+}
+#td-profile-layout-bar button svg,
+#trophydeck-sticky .td-profile-layout-bar button svg { display:block; width:18px; height:18px; flex:none; }
 `;
     document.head.append(style);
     applyTheme();
