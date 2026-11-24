@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.21
+// @version      1.0.22
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.21";
+const APP_VERSION = "1.0.22";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -1925,11 +1925,11 @@ function readProfileLayout() {
         const previous = items.find(item => item && item.id === id) || {};
         const defaultSpan = id === 'recent' ? 3 : id === 'games' ? 2 : 1;
         const span = [1,2,3].includes(previous.span) ? previous.span : (previous.full ? 3 : defaultSpan);
-        const safeSpan = id === 'games' ? Math.max(2, span) : span;
+        const safeSpan = id === 'recent' ? 3 : id === 'games' ? Math.max(2, span) : span;
         const defaultColumn = id === 'recent' || id === 'games' ? 0 : 2;
         let col = Number.isInteger(previous.col) ? previous.col : (previous.zone === 'left' ? 0 : previous.zone === 'center' ? 1 : previous.zone === 'sidebar' ? 2 : id === 'games' && previous.align === 'right' ? 1 : defaultColumn);
         col = Math.max(0, Math.min(3 - safeSpan, col));
-        return {id, span:safeSpan, col, hidden:previous.hidden === true};
+        return {id, span:safeSpan, col, hidden:previous.hidden === true, breakBefore:previous.breakBefore === true};
     });
 }
 
@@ -2008,45 +2008,47 @@ function collectProfileSections(areas) {
     return sections;
 }
 
-let profileGridObserver = null;
-let profileGridFrame = 0;
-function scheduleProfileGrid() {
-    if (profileGridFrame) return;
-    profileGridFrame = requestAnimationFrame(() => {
-        profileGridFrame = 0;
-        const grid = document.querySelector('[data-td-unified-grid]');
-        if (!grid) return;
-        Array.from(grid.children).forEach(section => {
-            if (!section.dataset.tdProfileSection || section.hidden) return;
-            const rows = Math.max(1, Math.ceil(section.getBoundingClientRect().height / 8));
-            const value = 'span ' + rows;
-            if (section.style.gridRowEnd !== value) section.style.gridRowEnd = value;
-        });
-    });
+// Packs blocks into whole rows of three slots, with no overlapping cells.
+function packProfileRows(items, visibleIds) {
+    const placement = new Map();
+    let row = 0, occupied = [false, false, false];
+    for (const item of items) {
+        if (visibleIds && !visibleIds.has(item.id)) continue;
+        if (item.breakBefore && occupied.some(Boolean)) { row++; occupied = [false, false, false]; }
+        function findSlot() {
+            const valid = col => col >= 0 && col + item.span <= 3 && occupied.slice(col, col + item.span).every(value => !value);
+            if (valid(item.col)) return item.col;
+            for (let col = 0; col <= 3 - item.span; col++) if (valid(col)) return col;
+            return -1;
+        }
+        let col = findSlot();
+        if (col < 0) { row++; occupied = [false, false, false]; col = findSlot(); }
+        for (let i = col; i < col + item.span; i++) occupied[i] = true;
+        placement.set(item.id, {row, col});
+    }
+    return placement;
 }
+
+function visibleProfileIds() {
+    const areas = profileLayoutAreas();
+    if (!areas) return new Set();
+    return new Set(Array.from(areas.grid.children).filter(section => section.dataset.tdProfileSection && !section.hidden).map(section => section.dataset.tdProfileSection));
+}
+
+function scheduleProfileGrid() { /* Whole-row CSS grid adjusts automatically to content size. */ }
 
 function applyProfileLayout() {
     const areas = profileLayoutAreas();
     if (!areas) return;
     const sections = collectProfileSections(areas), items = readProfileLayout();
-    if (!profileGridObserver && typeof ResizeObserver !== 'undefined') profileGridObserver = new ResizeObserver(scheduleProfileGrid);
     for (const item of items) {
         const section = sections[item.id];
         if (!section) continue;
         section.hidden = item.hidden && !profileLayoutEditing;
         section.dataset.tdSpan = String(item.span);
-        if (item.id === 'recent') {
-            const list = section.querySelector('#recent-trophies');
-            if (list) {
-                const trophies = Array.from(list.children);
-                const active = trophies.findIndex(trophy => trophy.classList.contains('active'));
-                const limit = item.span * 4;
-                if (active >= limit && trophies[0]) { trophies[active].classList.remove('active'); trophies[0].classList.add('active'); }
-            }
-        }
-        section.style.gridColumn = (item.col + 1) + ' / span ' + item.span;
+
         if (profileLayoutEditing) updateProfileSectionControls(section, item);
-        if (section.parentElement !== areas.grid) { areas.grid.append(section); if (profileGridObserver) profileGridObserver.observe(section); }
+        if (section.parentElement !== areas.grid) areas.grid.append(section);
     }
     let anchor = null;
     for (const item of items.slice().reverse()) {
@@ -2054,6 +2056,14 @@ function applyProfileLayout() {
         if (!section) continue;
         if (section.nextElementSibling !== anchor) areas.grid.insertBefore(section, anchor);
         anchor = section;
+    }
+    const visible = new Set(items.filter(item => sections[item.id] && !sections[item.id].hidden).map(item => item.id));
+    const placement = packProfileRows(items, visible);
+    for (const item of items) {
+        const section = sections[item.id], position = placement.get(item.id);
+        if (!section || !position) continue;
+        section.style.gridColumn = (position.col + 1) + ' / span ' + item.span;
+        section.style.gridRow = String(position.row + 1);
     }
     // Keep unrecognized site sections intact, including the flagged notice.
     const hasExtras = [areas.main, areas.sidebar].some(parent => Array.from(parent.children).some(child => !['SCRIPT','STYLE'].includes(child.tagName)));
@@ -2068,10 +2078,45 @@ function moveProfileSection(items, id, col, targetId, after = false) {
     if (source < 0) return next;
     const [moved] = next.splice(source, 1);
     moved.col = Math.max(0, Math.min(3 - moved.span, Number.isFinite(col) ? col : moved.col));
+    moved.breakBefore = false;
     const target = next.findIndex(item => item.id === targetId);
     if (target >= 0) next.splice(target + (after ? 1 : 0), 0, moved);
     else if (id === targetId) next.splice(source, 0, moved);
     else next.push(moved);
+    return next;
+}
+
+function resizeProfileSection(items, id, span, visibleIds) {
+    const next = items.map(item => ({...item}));
+    const index = next.findIndex(item => item.id === id);
+    if (index < 0 || id === 'recent') return next;
+    const before = packProfileRows(next, visibleIds), position = before.get(id);
+    const selected = next[index];
+    selected.span = id === 'games' ? Math.max(2, Math.min(3, span)) : Math.max(1, Math.min(3, span));
+    selected.col = Math.min(position ? position.col : selected.col, 3 - selected.span);
+    const trial = packProfileRows(next, visibleIds).get(id);
+    if (position && trial && trial.row !== position.row) {
+        const rowStart = next.findIndex(entry => before.get(entry.id)?.row === position.row);
+        if (rowStart >= 0 && rowStart < index) { next.splice(index, 1); next.splice(rowStart, 0, selected); }
+        selected.col = 0;
+        selected.breakBefore = position.row > 0;
+    }
+    return next;
+}
+
+function swapGamesInRow(items, visibleIds) {
+    const next = items.map(item => ({...item}));
+    const positions = packProfileRows(next, visibleIds), position = positions.get('games');
+    const game = next.find(item => item.id === 'games');
+    if (!game || !position || game.span !== 2) return next;
+    const other = next.find(item => item.id !== 'games' && positions.get(item.id)?.row === position.row);
+    const right = position.col === 0;
+    game.col = right ? 1 : 0;
+    if (other) {
+        other.col = right ? 0 : 2;
+        const otherIndex = next.indexOf(other); next.splice(otherIndex, 1);
+        const gameIndex = next.indexOf(game); next.splice(right ? gameIndex : gameIndex + 1, 0, other);
+    }
     return next;
 }
 
@@ -2163,24 +2208,27 @@ function updateProfileSectionControls(section, item) {
             const items = readProfileLayout();
             const current = items.find(entry => entry.id === section.dataset.tdProfileSection);
             if (!current) return;
-            current.span = current.id === 'games' ? (current.span === 2 ? 3 : 2) : current.span % 3 + 1;
-            current.col = Math.min(current.col, 3 - current.span);
-            saveProfileLayout(items);
+            if (current.id === 'recent') return;
+            const span = current.id === 'games' ? (current.span === 2 ? 3 : 2) : current.span % 3 + 1;
+            saveProfileLayout(resizeProfileSection(items, current.id, span, visibleProfileIds()));
         });
+        const spanLabel = make('span', '', 'td-profile-span-label');
         if (item.id === 'games') {
             const align = make('button', '', 'td-profile-align'); align.type = 'button';
-            align.addEventListener('click', () => { const items = readProfileLayout(); const current = items.find(entry => entry.id === 'games'); current.col = current.col === 0 ? 1 : 0; saveProfileLayout(items); });
-            toolbar.append(handle, title, up, down, align, width, visibility);
-        } else toolbar.append(handle, title, up, down, width, visibility);
+            align.addEventListener('click', () => saveProfileLayout(swapGamesInRow(readProfileLayout(), visibleProfileIds())));
+            toolbar.append(handle, title, up, down, align, spanLabel, width, visibility);
+        } else toolbar.append(handle, title, up, down, spanLabel, width, visibility);
         section.prepend(toolbar);
     }
     const width = toolbar.querySelector('.td-profile-width');
     const wide = item.span === 3;
-    width.disabled = false;
+    width.disabled = item.id === 'recent';
     setProfileLayoutIcon(width, wide ? 'shrink' : 'expand');
-    width.title = t('Change section width') + ' (' + item.span + '/3)';
+    width.title = item.id === 'recent' ? t('Recent trophies always use full width') : t('Change section width') + ' (' + item.span + '/3)';
     width.setAttribute('aria-label', width.title + ': ' + t(profileLayoutDefinitions.find(entry => entry.id === item.id).label));
     width.setAttribute('aria-pressed', String(wide));
+    const label = toolbar.querySelector('.td-profile-span-label');
+    if (label.textContent !== item.span + '/3') label.textContent = item.span + '/3';
     const visibility = toolbar.querySelector('.td-profile-visibility');
     const siblings = Array.from(section.parentElement.children).filter(child => child.dataset.tdProfileSection);
     const siblingIndex = siblings.indexOf(section);
@@ -2188,8 +2236,10 @@ function updateProfileSectionControls(section, item) {
     toolbar.querySelector('.td-profile-down').disabled = siblingIndex < 0 || siblingIndex >= siblings.length - 1;
     if (item.id === 'games') {
         const align = toolbar.querySelector('.td-profile-align');
-        setProfileLayoutIcon(align, item.col === 0 ? 'alignRight' : 'alignLeft');
-        align.title = item.col === 0 ? t('Move games to the right') : t('Move games to the left');
+        const gamePosition = packProfileRows(readProfileLayout(), visibleProfileIds()).get('games');
+        const gameOnRight = gamePosition && gamePosition.col === 1;
+        setProfileLayoutIcon(align, gameOnRight ? 'alignLeft' : 'alignRight');
+        align.title = gameOnRight ? t('Move games to the left') : t('Move games to the right');
         align.setAttribute('aria-label', align.title); align.disabled = item.span === 3;
     }
     setProfileLayoutIcon(visibility, item.hidden ? 'eyeOff' : 'eye');
@@ -2225,7 +2275,7 @@ const profileLayoutIcons = {
     edit: 'M12 20h9 M16.5 3.5a2.12 2.12 0 013 3L8 18l-4 1 1-4z',
     alignRight: 'M4 7h16 M4 12h16 M4 17h16 M15 4l4 3-4 3', alignLeft: 'M4 7h16 M4 12h16 M4 17h16 M9 4L5 7l4 3',
     done: 'M5 12l5 5L20 6', reset: 'M3 12a9 9 0 1 0 3-6.7 M3 3v6h6',
-    drag: 'M9 5h.01 M15 5h.01 M9 12h.01 M15 12h.01 M9 19h.01 M15 19h.01',
+    drag: 'M12 2v20 M2 12h20 M9 5l3-3 3 3 M9 19l3 3 3-3 M5 9l-3 3 3 3 M19 9l3 3-3 3',
     up: 'M6 14l6-6 6 6', down: 'M6 10l6 6 6-6',
     expand: 'M4 9V4h5 M15 4h5v5 M20 15v5h-5 M9 20H4v-5',
     shrink: 'M4 9h5V4 M15 4v5h5 M20 15h-5v5 M9 20v-5H4',
@@ -2907,6 +2957,11 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 @media (max-width:800px) { #content > .td-unified-grid { column-gap:5px; } }
 /* Leave the original sidebar available to PSNP+ for sections added later. */
 #content .row.td-profile-source-empty { height:1px; min-height:0; margin-top:0; margin-bottom:0; overflow:visible; }
+/* Each grid row has three slots and a shared top edge. */
+#content > .td-unified-grid { grid-auto-rows:auto; grid-auto-flow:row; gap:10px; }
+#content > .td-unified-grid > .td-profile-section { padding-bottom:0; }
+#content > .td-unified-grid [data-td-profile-section="milestones"] > .title { margin-top:0 !important; }
+.td-profile-section-controls .td-profile-span-label { color:#fff; background:color-mix(in srgb,var(--td-accent) 70%,black); border-radius:3px; padding:4px 6px; font:bold 12px/1 Arial,sans-serif; white-space:nowrap; }
 `;
     document.head.append(style);
     applyTheme();
