@@ -292,5 +292,7 @@ var __trophyDeckLocale_de = {
   "Change section width": "Breite des Bereichs ändern",
   "Move games to the right": "Spiele nach rechts setzen",
   "Move games to the left": "Spiele nach links setzen",
-  "Use the edit icon beside the profile name. Drag sections around the three-column grid and use the width button to change their size. The reset icon appears while editing.": "Öffne die Bearbeitung neben dem Profilnamen. Verschiebe Bereiche im Raster mit drei Spalten und ändere ihre Breite mit dem Breitensymbol. Das Zurücksetzen-Symbol erscheint während der Bearbeitung."
+  "Use the edit icon beside the profile name. Drag sections around the three-column grid and use the width button to change their size. The reset icon appears while editing.": "Öffne die Bearbeitung neben dem Profilnamen. Verschiebe Bereiche im Raster mit drei Spalten und ändere ihre Breite mit dem Breitensymbol. Das Zurücksetzen-Symbol erscheint während der Bearbeitung.",
+  "No games in the cabinet yet.": "Noch keine Spiele im Cabinet.",
+  "Enable the game cabinet in settings.": "Aktiviere das Spiele Cabinet in den Einstellungen."
 };

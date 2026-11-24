@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.24
+// @version      1.0.25
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.24";
+const APP_VERSION = "1.0.25";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -1690,12 +1690,13 @@ function updateGameCabinet() {
     if(!profile){
         return;
     }
-    if(!enabled('trophydeck.cabinet')) {
-        document.querySelectorAll('.td-cabinet-add,[data-td-cabinet]').forEach(e=>e.remove());
-        return;
+    const cabinetEnabled = enabled('trophydeck.cabinet');
+    if (!cabinetEnabled) {
+        document.querySelectorAll('.td-cabinet-add').forEach(e=>e.remove());
+        if (!profileLayoutEditing) { document.querySelectorAll('[data-td-cabinet]').forEach(e=>e.remove()); return; }
     }
     const key=cabinetKey(profile);
-    document.querySelectorAll('tr td a.title[href*="/trophies/"]').forEach(link=>{
+    if (cabinetEnabled) document.querySelectorAll('tr td a.title[href*="/trophies/"]').forEach(link=>{
             const u=new URL(link.href,location.href), match=u.pathname.match(/^\/trophies\/(\d+)(?:-[^/]*)?\/([^/]+)\/?$/);
             if(!match || ('/'+match[2]).toLowerCase()!==profile.path.toLowerCase()){
                 return;
@@ -1737,7 +1738,7 @@ function updateGameCabinet() {
             sync();
         });
     function renderCabinet() {
-        const sidebar=document.querySelector('div.sidebar');
+        const sidebar=document.querySelector('#content > .td-profile-source > .sidebar') || document.querySelector('#content > .row:not(.td-unified-grid) > .sidebar');
         if(!sidebar){
             return;
         }
@@ -1756,15 +1757,13 @@ function updateGameCabinet() {
         }
         container.replaceChildren();
         const list=readList(key);
-        if(!list.length){
-            container.remove();
-            return;
-        }
+        if (!list.length && !profileLayoutEditing) { container.remove(); return; }
         const heading=make('div',null,'title flex v-align');
         const grow=make('div',null,'grow');
         grow.append(make('h3',t("Game cabinet")));
         heading.append(grow);
         const grid=make('div',null,'box td-cabinet-grid');
+        if (!list.length) grid.append(make('p', t(cabinetEnabled ? 'No games in the cabinet yet.' : 'Enable the game cabinet in settings.'), 'td-cabinet-placeholder'));
         list.forEach(game=>{
                 const tile=make('div',null,'td-cabinet-tile');
                 const open=make('a',null,'td-cabinet-image');
@@ -1943,13 +1942,14 @@ function profileLayoutAreas() {
     const profile = profileInfo();
     if (!profile || location.pathname.replace(/\/$/, '').toLowerCase() !== profile.path.toLowerCase()) return null;
     const content = document.querySelector('#content');
-    const sidebar = content && content.querySelector('.row > .sidebar');
-    const main = sidebar && sidebar.parentElement.querySelector(':scope > .col-xs-8');
-    if (!content || !sidebar || !main) return null;
-    const row = sidebar.parentElement;
+    const row = content && content.querySelector(':scope > .row:not(.td-unified-grid)');
+    const sidebar = row && row.querySelector(':scope > .sidebar');
+    const main = row && row.querySelector(':scope > .col-xs-8');
+    if (!content || !row || !sidebar || !main) return null;
+    row.classList.add('td-profile-source');
     let grid = content.querySelector(':scope > [data-td-unified-grid]');
     if (!grid) {
-        grid = make('div', null, 'td-unified-grid');
+        grid = make('div', null, 'td-unified-grid row');
         grid.dataset.tdUnifiedGrid = 'true';
         row.before(grid);
     }
@@ -1985,12 +1985,16 @@ function collectProfileSections(areas) {
         sections.gameCabinet = cabinet;
     }
     const titles = {'scanned games':'scanned','trophy cabinet':'trophyCabinet','rarest trophies':'rarest','rarest unique trophies':'rarest','trophy milestones':'milestones'};
-    Array.from(sidebar.querySelectorAll(':scope > .title h3')).forEach(heading => {
+    // PSNP+ can insert its scanned-games block beside the cabinet title after
+    // Trophy Deck has already moved that title into the grid.
+    const sidebarHosts = [sidebar, sections.trophyCabinet].filter(Boolean);
+    for (const host of sidebarHosts) Array.from(host.querySelectorAll(':scope > .title h3')).forEach(heading => {
         const id = titles[heading.textContent.trim().toLowerCase().replace(/\s*\([^)]*\)$/, '')];
         const title = heading.closest('.title');
         const box = title && title.nextElementSibling;
         if (!id || sections[id] || !box || !box.matches('.box')) return;
         const wrapper = make('div', null, 'td-profile-section');
+        if (id === 'trophyCabinet') wrapper.classList.add('sidebar');
         wrapper.dataset.tdProfileSection = id;
         title.before(wrapper); wrapper.append(title, box); sections[id] = wrapper;
     });
@@ -2000,7 +2004,7 @@ function collectProfileSections(areas) {
             return small && /^updated\b/i.test(small.textContent.trim());
         });
         if (status) {
-            const wrapper = make('div', null, 'td-profile-section td-profile-update');
+            const wrapper = make('div', null, 'td-profile-section td-profile-update sidebar');
             wrapper.dataset.tdProfileSection = 'updateInfo';
             status.before(wrapper); wrapper.append(status); sections.updateInfo = wrapper;
         }
@@ -2052,6 +2056,7 @@ function scheduleProfileGrid() {
 }
 
 const PROFILE_EDIT_GAME_LIMIT = 15;
+const PROFILE_EDIT_MILESTONE_LIMIT = 15;
 function updateProfileGamePreview(section) {
     if (!section) return;
     for (const table of section.querySelectorAll('#gamesTable, #search-results')) {
@@ -2062,6 +2067,15 @@ function updateProfileGamePreview(section) {
             row.classList.toggle('td-profile-game-overflow', profileLayoutEditing && count > PROFILE_EDIT_GAME_LIMIT);
         });
     }
+}
+
+function updateProfileMilestonePreview(section) {
+    if (!section) return;
+    let count = 0;
+    section.querySelectorAll('table.box tr').forEach(row => {
+        count++;
+        row.classList.toggle('td-profile-milestone-overflow', profileLayoutEditing && count > PROFILE_EDIT_MILESTONE_LIMIT);
+    });
 }
 
 // The site's infinite-scroll handler checks nextPage on scroll. Temporarily set it
@@ -2085,6 +2099,7 @@ function applyProfileLayout() {
     const sections = collectProfileSections(areas), items = readProfileLayout();
     if (!profileGridObserver && typeof ResizeObserver !== 'undefined') profileGridObserver = new ResizeObserver(scheduleProfileGrid);
     updateProfileGamePreview(sections.games);
+    updateProfileMilestonePreview(sections.milestones);
     for (const item of items) {
         const section = sections[item.id];
         if (!section) continue;
@@ -2299,6 +2314,7 @@ function setProfileLayoutEditing(editing) {
     const areas = profileLayoutAreas();
     if (!areas) { tdDialog(t('Profile layout'), [], t('Open a profile page to arrange its sections.')); return false; }
     profileLayoutEditing = editing;
+    updateGameCabinet();
     if (!editing && profileNextPageRestore) profileNextPageRestore();
     document.querySelectorAll('[data-td-layout-controls]').forEach(bar => {
         const button = bar.querySelector('.td-profile-layout-edit');
@@ -3018,6 +3034,10 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 #content > .td-unified-grid.td-profile-edit-zone .td-profile-game-overflow,
 #content > .td-unified-grid.td-profile-edit-zone #gamesTable #load-more,
 #content > .td-unified-grid.td-profile-edit-zone #gamesTable #table-loading { display:none !important; }
+/* Keep the structural hooks used by PSNP+ without adding its row margins. */
+#content > .td-unified-grid.row { margin:0; }
+#content > .td-unified-grid.td-profile-edit-zone .td-profile-milestone-overflow { display:none !important; }
+.td-cabinet-placeholder { margin:0; padding:8px; color:#555; }
 `;
     document.head.append(style);
     applyTheme();
