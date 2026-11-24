@@ -291,5 +291,6 @@ var __trophyDeckLocale_en = {
   "Lower area": "Lower area",
   "Change section width": "Change section width",
   "Move games to the right": "Move games to the right",
-  "Move games to the left": "Move games to the left"
+  "Move games to the left": "Move games to the left",
+  "Use the edit icon beside the profile name. Drag sections around the three-column grid and use the width button to change their size. The reset icon appears while editing.": "Use the edit icon beside the profile name. Drag sections around the three-column grid and use the width button to change their size. The reset icon appears while editing."
 };
