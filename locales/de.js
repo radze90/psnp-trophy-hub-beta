@@ -267,5 +267,13 @@ var __trophyDeckLocale_de = {
   "Arrange profile sections": "Profilbereiche anordnen",
   "Arrange, show or hide the sections of profile pages.": "Bereiche auf Profilseiten anordnen, ein- oder ausblenden.",
   "In Settings → Profile page → Arrange profile sections, reorder sections, choose their column and toggle visibility. The layout applies to all profiles in this browser.": "Unter Einstellungen → Profilseite → Profilbereiche anordnen lassen sich Bereiche sortieren, einer Spalte zuweisen und ein- oder ausblenden. Die Anordnung gilt für alle Profile in diesem Browser.",
-  "Profile update status": "Profil-Aktualisierung"
+  "Profile update status": "Profil-Aktualisierung",
+  "Edit profile layout": "Profilbereiche bearbeiten",
+  "Show": "Einblenden",
+  "Hide": "Ausblenden",
+  "Show section": "Bereich einblenden",
+  "Hide section": "Bereich ausblenden",
+  "Use “Edit profile layout” on a profile page to move or hide sections.": "Wähle auf einer Profilseite „Profilbereiche bearbeiten“, um Bereiche zu verschieben oder auszublenden.",
+  "Drag sections by their handles to a highlighted position. Hidden sections remain visible while editing.": "Ziehe Bereiche am Griff an eine markierte Position. Ausgeblendete Bereiche bleiben während der Bearbeitung sichtbar.",
+  "On a profile page, select Edit profile layout. Drag sections into position and use Hide or Show. Reset the layout in Settings → Profile page.": "Wähle auf einer Profilseite „Profilbereiche bearbeiten“. Ziehe Bereiche an die gewünschte Position und blende sie ein oder aus. Unter Einstellungen → Profilseite kannst du die Anordnung zurücksetzen."
 };

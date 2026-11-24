@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.15
+// @version      1.0.16
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.15";
+const APP_VERSION = "1.0.16";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -376,10 +376,11 @@ function openSettings() {
         dialog.append(section);
     });
 
-    const layoutButton = make('button', t('Arrange profile sections'), 'epic-button');
-    layoutButton.type = 'button';
-    layoutButton.addEventListener('click', openProfileLayout);
-    sections.profile.append(make('small', t('Arrange, show or hide the sections of profile pages.'), 'epic-muted'), layoutButton);
+    const layoutHint = make('small', t('Use “Edit profile layout” on a profile page to move or hide sections.'), 'epic-muted');
+    const layoutReset = make('button', t('Restore profile layout'), 'epic-button');
+    layoutReset.type = 'button';
+    layoutReset.addEventListener('click', resetProfileLayout);
+    sections.profile.append(layoutHint, layoutReset);
 
     const languageLabel = make('label', t("Language") + ': ', 'epic-width');
     const languageSelect = make('select');
@@ -707,7 +708,7 @@ function openFeatureGuide() {
                 [t("Size and behavior"), t("Under Settings → Trophy Deck, adjust the side, width, height, position and scrolling behavior, or restore defaults.")]
             ]],
         [t("On profile and game pages"), [
-                [t("Profile layout"), t("In Settings → Profile page → Arrange profile sections, reorder sections, choose their column and toggle visibility. The layout applies to all profiles in this browser.")],
+                [t("Profile layout"), t("On a profile page, select Edit profile layout. Drag sections into position and use Hide or Show. Reset the layout in Settings → Profile page.")],
                 [t("Game notes"), t("Click the note below a game or on its trophy page. Text is saved locally as you type; clicking outside closes the editor. Web links are clickable.")],
                 [t("Game cabinet"), t("Use the star beside a game to save it to the displayed profile’s cabinet. Hover over its cover to reveal the remove button.")],
                 [t("Profile navigation"), t("Optionally keep the upper navigation with Profile, Trophy Log and Stats visible while scrolling.")]
@@ -1907,6 +1908,8 @@ const profileLayoutDefinitions = [
     {id:'updateInfo', label:'Profile update status', zone:'sidebar'}
 ];
 const profileLayoutKey = 'trophydeck.profileLayout';
+let profileLayoutEditing = false;
+let draggedProfileSection = null;
 
 function readProfileLayout() {
     let saved = {};
@@ -2001,9 +2004,12 @@ function applyProfileLayout() {
     if (!areas) return;
     const sections = collectProfileSections(areas);
     const items = readProfileLayout();
-    for (const item of items) if (sections[item.id]) sections[item.id].hidden = item.hidden;
+    for (const item of items) if (sections[item.id]) {
+        sections[item.id].hidden = item.hidden && !profileLayoutEditing;
+        if (profileLayoutEditing) updateProfileSectionControls(sections[item.id], item);
+    }
     // Preserve the site's exact original order until the user changes the layout.
-    if (!localStorage.getItem(profileLayoutKey)) return;
+    if (!localStorage.getItem(profileLayoutKey) && !profileLayoutEditing) return;
     for (const zone of ['top','main','sidebar']) {
         const target = areas[zone];
         let anchor = null;
@@ -2016,64 +2022,134 @@ function applyProfileLayout() {
     }
 }
 
-function openProfileLayout() {
-    if (document.getElementById('td-profile-layout')) return;
-    const areas = profileLayoutAreas();
-    if (!areas) { tdDialog(t('Profile layout'), [], t('Open a profile page to arrange its sections.')); return; }
-    const dialog = make('dialog', null, 'td-dialog td-profile-layout-dialog');
-    dialog.id = 'td-profile-layout';
-    const heading = make('h2', t('Profile layout'));
-    const close = make('button', '×', 'td-dialog-close');
-    close.type = 'button'; close.title = t('Close'); close.setAttribute('aria-label', t('Close'));
-    close.addEventListener('click', () => dialog.close());
-    heading.append(close); dialog.append(heading);
-    dialog.append(make('p', t('Choose a position, reorder sections and show or hide them. Changes apply to all profiles in this browser.'), 'epic-muted'));
-    const list = make('div', null, 'td-profile-layout-list'); dialog.append(list);
-    let items = readProfileLayout();
-    let dragging = null;
-    function draw() {
-        list.replaceChildren();
-        const available = collectProfileSections(areas);
-        items.forEach((item, index) => {
-            const definition = profileLayoutDefinitions.find(entry => entry.id === item.id);
-            const row = make('div', null, 'td-profile-layout-row');
-            row.draggable = true;
-            row.addEventListener('dragstart', event => { dragging = item.id; row.classList.add('td-layout-dragging'); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', item.id); });
-            row.addEventListener('dragend', () => { dragging = null; row.classList.remove('td-layout-dragging'); });
-            row.addEventListener('dragover', event => { if (dragging && dragging !== item.id) { event.preventDefault(); row.classList.add('td-layout-target'); } });
-            row.addEventListener('dragleave', () => row.classList.remove('td-layout-target'));
-            row.addEventListener('drop', event => {
-                event.preventDefault(); row.classList.remove('td-layout-target');
-                const from = items.findIndex(entry => entry.id === dragging), to = items.findIndex(entry => entry.id === item.id);
-                if (from < 0 || to < 0 || from === to) return;
-                const [moved] = items.splice(from, 1); items.splice(to, 0, moved); dragging = null; saveProfileLayout(items); draw();
-            });
-            const label = make('label', null, 'td-profile-layout-name');
-            const visible = make('input'); visible.type = 'checkbox'; visible.checked = !item.hidden;
-            visible.addEventListener('change', () => { item.hidden = !visible.checked; saveProfileLayout(items); });
-            label.append(visible, make('span', t(definition.label)));
-            if (!available[item.id]) label.append(make('small', t('Not available on this profile'), 'epic-muted'));
-            const position = make('select'); position.setAttribute('aria-label', t('Position') + ': ' + t(definition.label));
-            [['top','Above the columns'], ['main','Main column'], ['sidebar','Side column']].forEach(([value, text]) => { const option = make('option', t(text)); option.value = value; position.append(option); });
-            position.value = item.zone;
-            position.addEventListener('change', () => { item.zone = position.value; saveProfileLayout(items); });
-            const controls = make('span', null, 'td-profile-layout-controls');
-            [['↑',-1,'Move section up'],['↓',1,'Move section down']].forEach(([symbol, offset, name]) => {
-                const button = make('button', symbol, 'epic-button'); button.type = 'button'; button.title = t(name); button.setAttribute('aria-label', t(name) + ': ' + t(definition.label));
-                button.disabled = index + offset < 0 || index + offset >= items.length;
-                button.addEventListener('click', () => { [items[index],items[index+offset]] = [items[index+offset],items[index]]; saveProfileLayout(items); draw(); });
-                controls.append(button);
-            });
-            row.append(label, position, controls); list.append(row);
-        });
+// Reorder data separately from the DOM, so absent and hidden sections remain intact.
+function moveProfileSection(items, id, zone, targetId, after = false) {
+    if (!['top','main','sidebar'].includes(zone)) return items;
+    const next = items.map(item => ({...item}));
+    const source = next.findIndex(item => item.id === id);
+    if (source < 0 || id === targetId) return next;
+    const [moved] = next.splice(source, 1);
+    moved.zone = zone;
+    const target = next.findIndex(item => item.id === targetId && item.zone === zone);
+    if (target >= 0) next.splice(target + (after ? 1 : 0), 0, moved);
+    else {
+        const last = next.reduce((found, item, index) => item.zone === zone ? index : found, -1);
+        next.splice(last < 0 ? next.length : last + 1, 0, moved);
     }
-    draw();
-    const reset = make('button', t('Restore profile layout'), 'epic-button'); reset.type = 'button';
-    reset.addEventListener('click', () => { items = profileLayoutDefinitions.map(({id,zone}) => ({id,zone,hidden:false})); saveProfileLayout(items); draw(); });
-    dialog.append(reset); document.body.append(dialog);
-    dialog.addEventListener('close', () => dialog.remove());
-    dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
-    dialog.showModal();
+    return next;
+}
+
+function resetProfileLayout() {
+    saveProfileLayout(profileLayoutDefinitions.map(({id, zone}) => ({id, zone, hidden:false})));
+}
+
+function clearProfileDropIndicators() {
+    document.querySelectorAll('.td-profile-drop-before, .td-profile-drop-after, .td-profile-drop-zone').forEach(element => {
+        element.classList.remove('td-profile-drop-before', 'td-profile-drop-after', 'td-profile-drop-zone');
+    });
+}
+
+function installProfileDropZone(container, zone) {
+    if (container.dataset.tdLayoutDropZone) return;
+    container.dataset.tdLayoutDropZone = zone;
+    function findTarget(event) {
+        const section = event.target.closest('[data-td-profile-section]');
+        return section && section.parentElement === container ? section : null;
+    }
+    container.addEventListener('dragover', event => {
+        if (!profileLayoutEditing || !draggedProfileSection) return;
+        event.preventDefault(); event.dataTransfer.dropEffect = 'move';
+        clearProfileDropIndicators();
+        const target = findTarget(event);
+        if (target && target.dataset.tdProfileSection !== draggedProfileSection) {
+            const bounds = target.getBoundingClientRect();
+            target.classList.add(event.clientY > bounds.top + bounds.height / 2 ? 'td-profile-drop-after' : 'td-profile-drop-before');
+        } else if (!target) container.classList.add('td-profile-drop-zone');
+    });
+    container.addEventListener('drop', event => {
+        if (!profileLayoutEditing || !draggedProfileSection) return;
+        event.preventDefault();
+        const target = findTarget(event);
+        const targetId = target?.dataset.tdProfileSection || null;
+        const after = !!target && event.clientY > target.getBoundingClientRect().top + target.getBoundingClientRect().height / 2;
+        const items = moveProfileSection(readProfileLayout(), draggedProfileSection, zone, targetId, after);
+        draggedProfileSection = null;
+        clearProfileDropIndicators();
+        saveProfileLayout(items);
+    });
+}
+
+function updateProfileSectionControls(section, item) {
+    section.classList.toggle('td-profile-section-hidden', item.hidden);
+    let toolbar = section.querySelector(':scope > .td-profile-section-controls');
+    if (!toolbar) {
+        toolbar = make('div', null, 'td-profile-section-controls');
+        const handle = make('button', '⋮⋮', 'td-profile-drag');
+        handle.type = 'button'; handle.draggable = true;
+        handle.title = t('Drag to move this section');
+        handle.setAttribute('aria-label', t('Drag section to reorder'));
+        handle.addEventListener('dragstart', event => {
+            draggedProfileSection = section.dataset.tdProfileSection;
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', draggedProfileSection);
+            if (event.dataTransfer.setDragImage) event.dataTransfer.setDragImage(section, 20, 20);
+            section.classList.add('td-profile-dragging');
+        });
+        handle.addEventListener('dragend', () => {
+            draggedProfileSection = null; section.classList.remove('td-profile-dragging'); clearProfileDropIndicators();
+        });
+        const title = make('strong', t(profileLayoutDefinitions.find(entry => entry.id === item.id).label));
+        const visibility = make('button', '', 'td-profile-visibility'); visibility.type = 'button';
+        visibility.addEventListener('click', () => {
+            const items = readProfileLayout();
+            const current = items.find(entry => entry.id === section.dataset.tdProfileSection);
+            if (current) { current.hidden = !current.hidden; saveProfileLayout(items); }
+        });
+        toolbar.append(handle, title, visibility); section.prepend(toolbar);
+    }
+    const visibility = toolbar.querySelector('.td-profile-visibility');
+    const visibilityText = item.hidden ? t('Show') : t('Hide');
+    if (visibility.textContent !== visibilityText) visibility.textContent = visibilityText;
+    visibility.title = item.hidden ? t('Show section') : t('Hide section');
+    visibility.setAttribute('aria-label', visibility.title + ': ' + t(profileLayoutDefinitions.find(entry => entry.id === item.id).label));
+}
+
+function setProfileLayoutEditing(editing) {
+    const areas = profileLayoutAreas();
+    if (!areas) { tdDialog(t('Profile layout'), [], t('Open a profile page to arrange its sections.')); return false; }
+    profileLayoutEditing = editing;
+    const bar = document.getElementById('td-profile-layout-bar');
+    if (bar) {
+        const button = bar.querySelector('button');
+        button.textContent = editing ? t('Done') : t('Edit profile layout');
+        button.setAttribute('aria-pressed', String(editing));
+        const hint = bar.querySelector('small');
+        hint.hidden = !editing;
+    }
+    for (const zone of ['top','main','sidebar']) {
+        areas[zone].classList.toggle('td-profile-edit-zone', editing);
+        installProfileDropZone(areas[zone], zone);
+    }
+    if (!editing) {
+        draggedProfileSection = null;
+        clearProfileDropIndicators();
+        areas.content.querySelectorAll('.td-profile-section-controls').forEach(element => element.remove());
+        areas.content.querySelectorAll('.td-profile-section-hidden, .td-profile-dragging').forEach(element => element.classList.remove('td-profile-section-hidden', 'td-profile-dragging'));
+    }
+    applyProfileLayout();
+    return true;
+}
+
+function setupProfileLayoutEditor() {
+    const areas = profileLayoutAreas();
+    if (!areas || document.getElementById('td-profile-layout-bar')) return;
+    const bar = make('div', null, 'td-profile-layout-bar'); bar.id = 'td-profile-layout-bar';
+    const button = make('button', t('Edit profile layout'), 'td-profile-layout-edit');
+    button.type = 'button'; button.setAttribute('aria-pressed', 'false');
+    button.addEventListener('click', () => setProfileLayoutEditing(!profileLayoutEditing));
+    const hint = make('small', t('Drag sections by their handles to a highlighted position. Hidden sections remain visible while editing.'));
+    hint.hidden = true;
+    bar.append(button, hint); areas.top.before(bar);
 }
 
 
@@ -2574,6 +2650,21 @@ html.trophydeck-psnp-colors a.scroll-top { background-color:var(--td-accent) !im
 
 /* Keep the floated update timestamp below the preceding profile section. */
 .td-profile-update { display:flow-root; clear:both; }
+/* Inline profile layout editor */
+.td-profile-layout-bar { position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:10px; padding:6px 8px; background:var(--td-base,#192b40); color:#fff; font:13px/1.4 Arial,sans-serif; }
+.td-profile-layout-bar button, .td-profile-section-controls button { border:0; border-radius:4px; padding:6px 10px; color:white; background:var(--td-accent,#315c89); cursor:pointer; font:600 13px/1.3 Arial,sans-serif; }
+.td-profile-layout-bar button:hover, .td-profile-section-controls button:hover { filter:brightness(1.15); }
+.td-profile-layout-bar small[hidden] { display:none; }
+.td-profile-edit-zone { outline:1px dashed var(--td-accent,#315c89); outline-offset:-2px; min-height:48px; }
+.td-profile-section-controls { display:flex; align-items:center; gap:8px; padding:5px 7px; background:var(--td-card,#223b55); border:1px solid var(--td-accent,#315c89); color:#fff; font:13px/1.3 Arial,sans-serif; }
+.td-profile-section-controls strong { flex:1; min-width:0; }
+.td-profile-section-controls .td-profile-drag { cursor:grab; font-size:18px; line-height:1; padding:3px 8px; }
+.td-profile-section-controls .td-profile-drag:active { cursor:grabbing; }
+.td-profile-section-hidden > :not(.td-profile-section-controls) { opacity:.38; }
+.td-profile-dragging { opacity:.5; }
+.td-profile-drop-before { box-shadow:inset 0 5px var(--td-accent,#315c89); }
+.td-profile-drop-after { box-shadow:inset 0 -5px var(--td-accent,#315c89); }
+.td-profile-drop-zone { background:color-mix(in srgb,var(--td-accent,#315c89) 18%,transparent); }
 `;
     document.head.append(style);
     applyTheme();
@@ -2582,6 +2673,7 @@ html.trophydeck-psnp-colors a.scroll-top { background-color:var(--td-accent) !im
     updateGameNotes();
     updateStickyNav();
     updateGameCabinet();
+    setupProfileLayoutEditor();
     applyProfileLayout();
     let layoutPending = false;
     const layoutObserver = new MutationObserver(records => {

@@ -267,5 +267,13 @@ var __trophyDeckLocale_en = {
   "Arrange profile sections": "Arrange profile sections",
   "Arrange, show or hide the sections of profile pages.": "Arrange, show or hide the sections of profile pages.",
   "In Settings → Profile page → Arrange profile sections, reorder sections, choose their column and toggle visibility. The layout applies to all profiles in this browser.": "In Settings → Profile page → Arrange profile sections, reorder sections, choose their column and toggle visibility. The layout applies to all profiles in this browser.",
-  "Profile update status": "Profile update status"
+  "Profile update status": "Profile update status",
+  "Edit profile layout": "Edit profile layout",
+  "Show": "Show",
+  "Hide": "Hide",
+  "Show section": "Show section",
+  "Hide section": "Hide section",
+  "Use “Edit profile layout” on a profile page to move or hide sections.": "Use “Edit profile layout” on a profile page to move or hide sections.",
+  "Drag sections by their handles to a highlighted position. Hidden sections remain visible while editing.": "Drag sections by their handles to a highlighted position. Hidden sections remain visible while editing.",
+  "On a profile page, select Edit profile layout. Drag sections into position and use Hide or Show. Reset the layout in Settings → Profile page.": "On a profile page, select Edit profile layout. Drag sections into position and use Hide or Show. Reset the layout in Settings → Profile page."
 };
