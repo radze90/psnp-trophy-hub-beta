@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.44
+// @version      1.0.45
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.44";
+const APP_VERSION = "1.0.45";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -1306,7 +1306,7 @@ function maxRailWidth() {
 }
 
 function recommendedRailWidth() {
-    return Math.max(260, Math.min(maxRailWidth(), 380));
+    return Math.max(260, Math.min(maxRailWidth(), 400));
 }
 
 function railWidth() {
@@ -2988,28 +2988,93 @@ function renderRail() {
 
 function addMenuItem() {
     const menu = document.querySelector('div.user-menu > div.dropdown > ul.dropdown-menu');
-    if (!menu) {
-        return false;
-    }
-    const psnp = Array.from(menu.querySelectorAll('a')).find(link => link.textContent.trim() === 'PSNP+ Settings');
-    if (!psnp) {
-        return false;
-    }
-    if (!menu.querySelector('[data-trophydeck-settings]')) {
-        const item = make('li');
-        const link = make('a', t("Trophy Deck Settings"));
-        link.href = '#';
-        link.dataset.trophydeckSettings = 'true';
-        link.addEventListener('click', event => {
-                event.preventDefault();
-                openSettings();
-            });
-        item.append(link);
-        psnp.closest('li').after(item);
+    if (!menu) return false;
+    if (menu.querySelector('[data-trophydeck-settings]')) return true;
+
+    const item = make('li');
+    const link = make('a', t('Trophy Deck Settings'));
+    link.href = '#';
+    link.dataset.trophydeckSettings = 'true';
+    link.addEventListener('click', event => {
+        event.preventDefault();
+        openSettings();
+    });
+    item.append(link);
+
+    // PSNP+ is optional. Place the entry near its settings when available,
+    // otherwise use the site's own settings or append it to the account menu.
+    const links = Array.from(menu.querySelectorAll('a'));
+    const anchor = links.find(entry => entry.textContent.trim() === 'PSNP+ Settings')
+        || links.find(entry => entry.textContent.trim() === 'Settings');
+    const anchorItem = anchor?.closest('li');
+    if (anchorItem) {
+        anchorItem.after(item);
+    } else {
+        menu.append(item);
     }
     return true;
 }
 
+
+// Observe late additions from PSNProfiles and PSNP+ without rebuilding the
+// profile layout more than once per animation frame.
+function observePageChanges() {
+    let layoutPending = false;
+    const layoutObserver = new MutationObserver(records => {
+        if (layoutPending || !records.some(record => record.addedNodes.length)) return;
+        layoutPending = true;
+        requestAnimationFrame(() => {
+            layoutPending = false;
+            applyProfileLayout();
+            updateRailOverlap();
+        });
+    });
+    layoutObserver.observe(document.body, {childList:true, subtree:true});
+
+    let notesPending = false;
+    const notesObserver = new MutationObserver(records => {
+        if (notesPending || !enabled('trophydeck.gameNotes') ||
+            !records.some(record => record.addedNodes.length)) return;
+        notesPending = true;
+        requestAnimationFrame(() => {
+            notesPending = false;
+            updateGameNotes();
+        });
+    });
+    notesObserver.observe(document.body, {childList:true, subtree:true});
+
+    const cabinetObserver = new MutationObserver(records => {
+        const gameAdded = records.some(record => Array.from(record.addedNodes).some(node =>
+            node.nodeType === 1 && (node.matches?.('tr') || node.querySelector?.('tr td a.title[href*="/trophies/"]'))
+        ));
+        if (gameAdded) updateGameCabinet();
+    });
+    cabinetObserver.observe(document.body, {childList:true, subtree:true});
+}
+
+function observeAccountMenu() {
+    const menu = document.querySelector('div.user-menu');
+    if (!menu) return;
+    const signature = () => Array.from(menu.querySelectorAll('div.user-nav a[href]'))
+        .map(link => link.getAttribute('href') + ':' + link.textContent.trim()).join('|');
+    let previous = signature();
+    const observer = new MutationObserver(() => {
+        const current = signature();
+        if (current !== previous) {
+            previous = current;
+            renderRail();
+        }
+    });
+    observer.observe(menu, {childList:true, subtree:true});
+}
+
+function installSettingsMenu() {
+    if (addMenuItem()) return;
+    const observer = new MutationObserver(() => {
+        if (addMenuItem()) observer.disconnect();
+    });
+    observer.observe(document.documentElement, {childList:true, subtree:true});
+}
 
 function init() {
     const style = make('style');
@@ -3631,6 +3696,7 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 @media (prefers-reduced-motion:reduce) { #trophydeck-rail.td-page-docked .epic-panel, #trophydeck-rail.td-page-docked.epic-closed .epic-panel { transition:none; } }
 `;
     document.head.append(style);
+
     applyTheme();
     applyPagePosition();
     migrateGameNotes();
@@ -3641,68 +3707,26 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
     updateGameCabinet();
     setupProfileLayoutEditor();
     applyProfileLayout();
-    let layoutPending = false;
-    const layoutObserver = new MutationObserver(records => {
-        if (layoutPending || !records.some(record => record.addedNodes.length)) return;
-        layoutPending = true;
-        requestAnimationFrame(() => { layoutPending = false; applyProfileLayout(); updateRailOverlap(); });
-    });
-    layoutObserver.observe(document.body, {childList:true, subtree:true});
     setupScrollControls();
+
+    observePageChanges();
+    observeAccountMenu();
+    installSettingsMenu();
+
     window.addEventListener('scroll', pauseProfileAutoloadForScroll, {capture:true, passive:true});
-    window.addEventListener('scroll',applyRailPosition,{passive:true});
-    window.addEventListener('resize',()=>{
-            applyPagePosition();
-            const rail=document.getElementById('trophydeck-rail');
-            if(rail){
-                rail.style.setProperty('--epic-width',railWidth()+'px');
-            }applyRailPosition();
-            scheduleProfileGrid();
-        },{passive:true});
-    let scanPending = false;
-    const gameObserver = new MutationObserver(records => {
-            if (!enabled('trophydeck.gameNotes') || !records.some(record => record.addedNodes.length)) {
-                return;
-            }
-            if (!scanPending) {
-                scanPending = true;
-                requestAnimationFrame(() => {
-                        scanPending = false;
-                        updateGameNotes();
-                    });
-            }
-        });
-    gameObserver.observe(document.body, { childList: true, subtree: true });
-    const cabinetObserver=new MutationObserver(records=>{
-            if(records.some(record=>Array.from(record.addedNodes).some(node=>node.nodeType===1 && (node.matches?.('tr') || node.querySelector?.('tr td a.title[href*=\"/trophies/\"]'))))) {
-                updateGameCabinet();
-            }
-        });
-    cabinetObserver.observe(document.body,{childList:true,subtree:true});
-    const accountMenu = document.querySelector('div.user-menu');
-    if (accountMenu) {
-        const signature = () => Array.from(accountMenu.querySelectorAll('div.user-nav a[href]')).map(link => link.getAttribute('href') + ':' + link.textContent.trim()).join('|');
-        let previousAccountMenu = signature();
-        const accountObserver = new MutationObserver(() => {
-            const current = signature();
-            if (current !== previousAccountMenu) { previousAccountMenu = current; renderRail(); }
-        });
-        accountObserver.observe(accountMenu, {childList:true, subtree:true});
-    }
-    if (!addMenuItem()) {
-        const observer = new MutationObserver(() => {
-                if (addMenuItem()) {
-                    observer.disconnect();
-                }
-            });
-        observer.observe(document.documentElement, { childList: true, subtree: true });
-    }
+    window.addEventListener('scroll', applyRailPosition, {passive:true});
+    window.addEventListener('resize', () => {
+        applyPagePosition();
+        const rail = document.getElementById('trophydeck-rail');
+        if (rail) rail.style.setProperty('--epic-width', railWidth() + 'px');
+        applyRailPosition();
+        scheduleProfileGrid();
+    }, {passive:true});
 }
 
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init, { once:true });
-}
-else {
+    document.addEventListener('DOMContentLoaded', init, {once:true});
+} else {
     init();
 }
 
