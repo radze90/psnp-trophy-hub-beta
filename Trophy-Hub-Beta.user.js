@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.39
+// @version      1.0.40
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.39";
+const APP_VERSION = "1.0.40";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -373,6 +373,7 @@ function openSettings() {
     dialog.append(viewportHeader);
     // IDs remain stable when the display language changes.
     const categories = [
+        ['language', 'Language', []],
         ['deck', 'Trophy Deck', ['showRail']],
         ['profile', "Profile page", ['stickyNav', 'hideFlaggedBox', 'scrollButtons']],
         ['blocks', "Deck sections", ['showAccountLinks', 'showStats', 'showLinks', 'showNote', 'globalNote', 'customLinks', 'favorites', 'cabinet', 'cabinetNames']],
@@ -418,8 +419,8 @@ function openSettings() {
             location.reload();
         });
     languageLabel.append(languageSelect);
-    sections.deck.append(languageLabel);
-    sections.deck.append(make('small', t("The language is applied after reloading the page."), 'epic-muted'));
+    sections.language.append(languageLabel);
+    sections.language.append(make('small', t("The language is applied after reloading the page."), 'epic-muted'));
 
     const linesLabel = make('label', t("Maximum lines in game notes: "), 'epic-width');
     const lines = document.createElement('select');
@@ -543,6 +544,21 @@ function openSettings() {
 
 
     sections.analytics.append(make('p', t("Optional local counters, switches and appearance settings including the color theme. No note content, URLs or profile names. Export is manual; nothing is sent automatically."), 'epic-muted'));
+    // Group the existing controls by the decision the user is making.
+    const positionGroup = make('div', null, 'td-deck-settings-group');
+    const sizeGroup = make('div', null, 'td-deck-settings-group');
+    function deckGroupHeading(group, symbol, title, description) {
+        const heading = make('div', null, 'td-deck-group-heading');
+        const icon = make('span', symbol, 'td-deck-group-icon');
+        icon.setAttribute('aria-hidden', 'true');
+        const copy = make('div');
+        copy.append(make('strong', t(title)), make('small', t(description), 'td-setting-description'));
+        heading.append(icon, copy);
+        group.append(heading);
+    }
+    deckGroupHeading(positionGroup, '↔', 'Position and scrolling', 'Choose a screen edge and how the sidebar follows you.');
+    deckGroupHeading(sizeGroup, '↕', 'Size', 'Set how much space the open sidebar uses.');
+    sections.deck.append(positionGroup, sizeGroup);
     const widthLabel = make('label', t("Trophy Deck width: "), 'epic-width');
     const widthValue = make('span', railWidth() + ' px');
     const width = document.createElement('input');
@@ -562,9 +578,9 @@ function openSettings() {
             }
         });
     widthLabel.append(widthValue, width);
-    sections.deck.append(widthLabel);
+    sizeGroup.append(widthLabel);
     const viewportHint=make('small','','epic-muted');
-    sections.deck.append(viewportHint);
+    sizeGroup.append(viewportHint);
     const sideLabel = make('label', t("Trophy Deck side: "), 'epic-width');
     const side = document.createElement('select');
     [['right', t("Right")], ['left', t("Left")]].forEach(([value, text]) => {
@@ -578,7 +594,7 @@ function openSettings() {
             renderRail();
         });
     sideLabel.append(side);
-    sections.deck.append(sideLabel);
+    positionGroup.append(sideLabel);
     const behaviorLabel=make('label',t("Deck behavior: "),'epic-width');
     const behavior=make('select');
     [['follow',t("Scroll until pinned to the top")],['fixed',t("Fixed on screen")]].forEach(([v,t])=>{
@@ -593,7 +609,15 @@ function openSettings() {
             applyRailPosition();
         });
     behaviorLabel.append(behavior);
-    sections.deck.append(behaviorLabel);
+    const behaviorHint = make('small', '', 'td-setting-description');
+    function updateBehaviorHint() {
+        behaviorHint.textContent = behavior.value === 'fixed'
+            ? t('The sidebar stays at the same height in the browser window while you scroll.')
+            : t('The sidebar moves with the page until it reaches the top, then stays visible.');
+    }
+    behavior.addEventListener('change', updateBehaviorHint);
+    updateBehaviorHint();
+    positionGroup.append(behaviorLabel, behaviorHint);
     const heightLabel=make('label',t("Deck position from top: "),'epic-width');
     const heightValue=make('span');
     const height=make('input');
@@ -612,7 +636,8 @@ function openSettings() {
         });
     height.addEventListener('change',()=>logEvent('setting.position'));
     heightLabel.append(heightValue,height);
-    sections.deck.append(heightLabel);
+    positionGroup.append(heightLabel);
+    positionGroup.append(make('small', t('Distance from the top of the browser window. You can also drag the sidebar header up or down.'), 'td-setting-description'));
     const panelHeightLabel=make('label',t("Trophy Deck height: "),'epic-width');
     const panelHeightValue=make('span');
     const panelHeight=make('input');
@@ -632,7 +657,7 @@ function openSettings() {
         });
     panelHeight.addEventListener('change',()=>logEvent('setting.panelHeight'));
     panelHeightLabel.append(panelHeightValue,panelHeight);
-    sections.deck.append(panelHeightLabel);
+    sizeGroup.append(panelHeightLabel);
     const defaults=make('button',t("Restore Trophy Deck defaults"),'epic-button');
     defaults.type='button';
     defaults.addEventListener('click',()=>{
@@ -3450,6 +3475,13 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 }
 #trophydeck-sticky > nav > a { flex:0 0 auto; }
 #trophydeck-sticky > .td-profile-layout-bar { flex:0 0 auto; }
+
+/* Settings groups keep position and size controls easy to scan. */
+#trophydeck-settings .td-deck-settings-group { margin:12px 0; padding:12px; background:color-mix(in srgb,var(--td-card) 72%,var(--td-base)); border-radius:4px; }
+#trophydeck-settings .td-deck-group-heading { display:flex; align-items:center; gap:10px; }
+#trophydeck-settings .td-deck-group-icon { display:flex; align-items:center; justify-content:center; flex:none; width:30px; height:30px; border-radius:4px; background:var(--td-accent); color:#fff; font-size:20px; line-height:1; }
+#trophydeck-settings .td-deck-settings-group .epic-width { margin-top:12px; }
+#trophydeck-settings .td-deck-settings-group .td-setting-description { font-size:12px; }
 `;
     document.head.append(style);
     applyTheme();

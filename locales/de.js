@@ -325,5 +325,12 @@ var __trophyDeckLocale_de = {
   "Game note": "Spielnotiz",
   "Previous game note · ": "Bisherige Spielnotiz · ",
   "Shows the same game note across profiles on this browser.": "Zeigt für dasselbe Spiel auf allen Profilen in diesem Browser dieselbe Notiz an.",
-  "Click the note below a game or on its trophy page. The same note appears for this game on every profile in this browser. Text is saved locally as you type. Clicking outside closes the editor. Web links are clickable.": "Klicke auf die Notiz unter einem Spiel oder auf dessen Trophäenseite. Für dasselbe Spiel erscheint in diesem Browser auf jedem Profil dieselbe Notiz. Der Text wird während der Eingabe lokal gespeichert. Ein Klick außerhalb schließt den Editor. Weblinks sind anklickbar."
+  "Click the note below a game or on its trophy page. The same note appears for this game on every profile in this browser. Text is saved locally as you type. Clicking outside closes the editor. Web links are clickable.": "Klicke auf die Notiz unter einem Spiel oder auf dessen Trophäenseite. Für dasselbe Spiel erscheint in diesem Browser auf jedem Profil dieselbe Notiz. Der Text wird während der Eingabe lokal gespeichert. Ein Klick außerhalb schließt den Editor. Weblinks sind anklickbar.",
+  "Position and scrolling": "Position und Scrollverhalten",
+  "Choose a screen edge and how the sidebar follows you.": "Wähle die Bildschirmseite und wie sich die Seitenleiste beim Scrollen verhält.",
+  "Size": "Größe",
+  "Set how much space the open sidebar uses.": "Lege fest, wie viel Platz die geöffnete Seitenleiste einnimmt.",
+  "The sidebar stays at the same height in the browser window while you scroll.": "Die Seitenleiste bleibt beim Scrollen an derselben Stelle im Browserfenster.",
+  "The sidebar moves with the page until it reaches the top, then stays visible.": "Die Seitenleiste bewegt sich mit der Seite nach oben und bleibt anschließend sichtbar.",
+  "Distance from the top of the browser window. You can also drag the sidebar header up or down.": "Abstand zum oberen Rand des Browserfensters. Du kannst die Seitenleiste auch an ihrer Überschrift nach oben oder unten ziehen."
 };

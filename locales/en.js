@@ -325,5 +325,12 @@ var __trophyDeckLocale_en = {
   "Game note": "Game note",
   "Previous game note · ": "Previous game note · ",
   "Shows the same game note across profiles on this browser.": "Shows the same game note across profiles on this browser.",
-  "Click the note below a game or on its trophy page. The same note appears for this game on every profile in this browser. Text is saved locally as you type. Clicking outside closes the editor. Web links are clickable.": "Click the note below a game or on its trophy page. The same note appears for this game on every profile in this browser. Text is saved locally as you type. Clicking outside closes the editor. Web links are clickable."
+  "Click the note below a game or on its trophy page. The same note appears for this game on every profile in this browser. Text is saved locally as you type. Clicking outside closes the editor. Web links are clickable.": "Click the note below a game or on its trophy page. The same note appears for this game on every profile in this browser. Text is saved locally as you type. Clicking outside closes the editor. Web links are clickable.",
+  "Position and scrolling": "Position and scrolling",
+  "Choose a screen edge and how the sidebar follows you.": "Choose a screen edge and how the sidebar follows you.",
+  "Size": "Size",
+  "Set how much space the open sidebar uses.": "Set how much space the open sidebar uses.",
+  "The sidebar stays at the same height in the browser window while you scroll.": "The sidebar stays at the same height in the browser window while you scroll.",
+  "The sidebar moves with the page until it reaches the top, then stays visible.": "The sidebar moves with the page until it reaches the top, then stays visible.",
+  "Distance from the top of the browser window. You can also drag the sidebar header up or down.": "Distance from the top of the browser window. You can also drag the sidebar header up or down."
 };
