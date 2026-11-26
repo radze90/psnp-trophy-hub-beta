@@ -294,5 +294,18 @@ var __trophyDeckLocale_de = {
   "Move games to the left": "Spiele nach links setzen",
   "Use the edit icon beside the profile name. Drag sections around the three-column grid and use the width button to change their size. The reset icon appears while editing.": "Öffne die Bearbeitung neben dem Profilnamen. Verschiebe Bereiche im Raster mit drei Spalten und ändere ihre Breite mit dem Breitensymbol. Das Zurücksetzen-Symbol erscheint während der Bearbeitung.",
   "No games in the cabinet yet.": "Noch keine Spiele im Cabinet.",
-  "Enable the game cabinet in settings.": "Aktiviere das Spiele Cabinet in den Einstellungen."
+  "Enable the game cabinet in settings.": "Aktiviere das Spiele Cabinet in den Einstellungen.",
+  "Account shortcuts in the deck": "Kontozugriff im Deck",
+  "Links to your own profile and account pages.": "Links zu deinem eigenen Profil und deinen Kontoseiten.",
+  "My account": "Mein Konto",
+  "My profile": "Mein Profil",
+  "Game lists": "Spielelisten",
+  "Trophy log": "Trophäen-Log",
+  "Trophy advisor": "Trophy Advisor",
+  "Statistics": "Statistik",
+  "Update profile": "Profil aktualisieren",
+  "Hide deck section": "Deck-Block ausblenden",
+  "Choose colors with the palette icon above or in All settings.": "Farben über das Palettensymbol oben oder unter „Alle Einstellungen“ ändern.",
+  "When signed in, use the menu links to open your profile, game lists, trophies, statistics or profile update.": "Wenn du angemeldet bist, öffnest du hier dein Profil, deine Spielelisten, Trophäen, Statistik oder die Profilaktualisierung.",
+  "Click a section heading to expand or collapse it. Use the eye icon to hide a section and enable it again in settings; reorder sections using the handle or arrows.": "Klicke auf die Überschrift, um einen Block auf- oder zuzuklappen. Mit dem Augensymbol blendest du ihn aus und in den Einstellungen wieder ein; Griff und Pfeile ändern die Reihenfolge."
 };

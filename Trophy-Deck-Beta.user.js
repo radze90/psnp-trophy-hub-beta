@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.26
+// @version      1.0.27
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.26";
+const APP_VERSION = "1.0.27";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -52,6 +52,7 @@ for (let i = localStorage.length - 1; i >= 0; i--) {
 const features = [
     { key: 'trophydeck.hideFlaggedBox', label: t("Hide flagged notice"), defaultValue: true },
     { key: 'trophydeck.showRail', label: t("Show Trophy Deck"), defaultValue: true },
+    { key: 'trophydeck.showAccountLinks', label: t('Account shortcuts in the deck'), defaultValue: true },
     { key: 'trophydeck.showStats', label: t("Progress in the deck"), defaultValue: true },
     { key: 'trophydeck.showLinks', label: t("Quick filters in the deck"), defaultValue: true },
     { key: 'trophydeck.showNote', label: t("Profile note in the deck"), defaultValue: true },
@@ -65,7 +66,7 @@ const features = [
     { key: 'trophydeck.customLinks', label: t("Custom links in the deck"), defaultValue: true },
     { key: 'trophydeck.noteWrap', label: t("Wrap game notes"), defaultValue: false },
     { key: 'trophydeck.psnpColors', label: t("Apply theme to PSNProfiles"), defaultValue: false },
-    { key: 'trophydeck.analytics', label: t("Count anonymous usage locally"), defaultValue: false }
+    { key: 'trophydeck.analytics', label: t("Count anonymous usage locally"), defaultValue: true }
 ];
 
 const removed = new Map();
@@ -184,7 +185,7 @@ function toggleControl(feature) {
     input.dataset.epicToggle = feature.key;
     const copy=make('span');
     copy.append(make('span',feature.label));
-    const descriptions={hideFlaggedBox:t("Hides the leaderboard notice on profile pages."),showRail:t("Shows Trophy Deck as a collapsible sidebar."),showStats:t("Calculates additional profile statistics."),showLinks:t("Provides preset views of the game list."),showNote:t("A note for the profile currently displayed."),globalNote:t("The same note on every page."),favorites:t("Saves profile links as favorites."),cabinet:t("Use the star in the profile game list to save games to the cabinet."),cabinetNames:t("Shows shortened game names below covers."),scrollButtons:t("Adds a scroll-to-bottom button next to the scroll-to-top button."),customLinks:t("Manage your own links and categories."),gameNotes:t("Shows personal game notes on profile and game pages."),noteWrap:t("Displays long game notes over multiple lines."),stickyNav:t("Keeps the profile navigation with Profile, Trophy Log and Stats visible while scrolling."),psnpColors:t("Applies the selected theme to page headers and dialogs."),analytics:t("Counts selected actions locally; nothing is sent automatically.")};
+    const descriptions={showAccountLinks:t('Links to your own profile and account pages.'),hideFlaggedBox:t("Hides the leaderboard notice on profile pages."),showRail:t("Shows Trophy Deck as a collapsible sidebar."),showStats:t("Calculates additional profile statistics."),showLinks:t("Provides preset views of the game list."),showNote:t("A note for the profile currently displayed."),globalNote:t("The same note on every page."),favorites:t("Saves profile links as favorites."),cabinet:t("Use the star in the profile game list to save games to the cabinet."),cabinetNames:t("Shows shortened game names below covers."),scrollButtons:t("Adds a scroll-to-bottom button next to the scroll-to-top button."),customLinks:t("Manage your own links and categories."),gameNotes:t("Shows personal game notes on profile and game pages."),noteWrap:t("Displays long game notes over multiple lines."),stickyNav:t("Keeps the profile navigation with Profile, Trophy Log and Stats visible while scrolling."),psnpColors:t("Applies the selected theme to page headers and dialogs."),analytics:t("Counts selected actions locally; nothing is sent automatically.")};
     const desc=descriptions[feature.key.replace('trophydeck.','')];
     if(desc){
         copy.append(make('small',desc,'td-setting-description'));
@@ -358,7 +359,7 @@ function openSettings() {
     const categories = [
         ['deck', 'Trophy Deck', ['showRail']],
         ['profile', "Profile page", ['stickyNav', 'hideFlaggedBox', 'scrollButtons']],
-        ['blocks', "Deck sections", ['showStats', 'showLinks', 'showNote', 'globalNote', 'customLinks', 'favorites', 'cabinet', 'cabinetNames']],
+        ['blocks', "Deck sections", ['showAccountLinks', 'showStats', 'showLinks', 'showNote', 'globalNote', 'customLinks', 'favorites', 'cabinet', 'cabinetNames']],
         ['notes', "Game notes", ['gameNotes', 'noteWrap']],
         ['colors', "Colors", ['psnpColors']],
         ['analytics', "Usage statistics", ['analytics']],
@@ -714,10 +715,11 @@ function openFeatureGuide() {
                 [t("Profile navigation"), t("Optionally keep the upper navigation with Profile, Trophy Log and Stats visible while scrolling.")]
             ]],
         [t("In Trophy Deck"), [
+                [t('My account'), t('When signed in, use the menu links to open your profile, game lists, trophies, statistics or profile update.')],
                 [t("Quick filters and progress"), t("Filters open preset game-list views. Progress calculates additional values from the displayed profile.")],
                 [t("Notes"), t("The global note appears on all pages; profile notes belong to a specific profile. Manage notes to view or delete saved notes.")],
                 [t("Favorites and links"), t("Add players or links. In edit mode, reorder or remove players; links can be organized into categories.")],
-                [t("Sections"), t("Click a section heading to expand or collapse it. Reorder sections using the handle or arrows.")]
+                [t("Sections"), t("Click a section heading to expand or collapse it. Use the eye icon to hide a section and enable it again in settings; reorder sections using the handle or arrows.")]
             ]],
         [t("Colors and data"), [
                 [t("Color theme"), t("Choose a theme in Settings. The optional page theme also colors selected areas of PSNProfiles.")],
@@ -864,7 +866,9 @@ function addLinks(panel, profile) {
             }
             platform.append(a);
         });
-    box.append(make('small',t("Platform"),'epic-muted'),platform);
+    const platformSection = make('div', null, 'td-platform-section');
+    platformSection.append(make('small',t("Platform"),'epic-muted'), platform);
+    box.append(platformSection);
     panel.append(box);
 }
 
@@ -1110,6 +1114,49 @@ function addCustomLinks(panel) {
     panel.append(box);
 }
 
+// Only links actually provided by the signed-in user's own menu are used.
+function readAccountShortcuts(menu) {
+    if (!menu || !menu.querySelector('a.dropdown-toggle[href]')) return [];
+    const definitions = [
+        ['your profile', 'My profile', 'accountUser'],
+        ['game lists', 'Game lists', 'accountList'],
+        ['trophy log', 'Trophy log', 'accountLog'],
+        ['trophy advisor', 'Trophy advisor', 'accountAdvisor'],
+        ['statistics', 'Statistics', 'accountStats'],
+        ['update profile', 'Update profile', 'accountRefresh']
+    ];
+    const links = Array.from(menu.querySelectorAll('ul.dropdown-menu a[href]'));
+    return definitions.flatMap(([text, label, icon]) => {
+        const original = links.find(link => link.textContent.trim().toLowerCase() === text);
+        if (!original) return [];
+        try {
+            const url = new URL(original.href, location.href);
+            if (url.origin !== location.origin || !/^https?:$/.test(url.protocol)) return [];
+            return [{label, icon, href:url.href}];
+        } catch (_) { return []; }
+    });
+}
+
+function addAccountShortcuts(panel) {
+    const menu = document.querySelector('div.user-menu > div.dropdown.user-nav');
+    const shortcuts = readAccountShortcuts(menu);
+    if (!shortcuts.length) return;
+    const box = make('section', null, 'epic-card td-account-card');
+    box.append(make('h3', t('My account')));
+    const links = make('nav', null, 'td-account-links');
+    links.setAttribute('aria-label', t('My account'));
+    shortcuts.forEach(shortcut => {
+        const link = make('a');
+        link.href = shortcut.href;
+        const icon = make('span', null, 'td-account-icon');
+        setProfileLayoutIcon(icon, shortcut.icon);
+        link.append(icon, make('span', t(shortcut.label)));
+        link.addEventListener('click', () => logEvent('account.' + shortcut.icon));
+        links.append(link);
+    });
+    box.append(links); panel.append(box);
+}
+
 
 function maxRailWidth() {
     return Math.max(260, Math.min(1600, Math.floor(window.innerWidth * 0.45 / 10)*10));
@@ -1263,7 +1310,7 @@ function updateGameNotes(refresh = false) {
 
 
 function setupCardSorting(cards) {
-    const defaults = ['overview', 'filters', 'globalNote', 'profileNote', 'customLinks', 'favorites', 'settings'];
+    const defaults = ['account', 'overview', 'filters', 'globalNote', 'profileNote', 'customLinks', 'favorites', 'settings'];
     let saved = [];
     try {
         saved = JSON.parse(localStorage.getItem('trophydeck.cardOrder') || '[]');
@@ -1271,6 +1318,7 @@ function setupCardSorting(cards) {
     if (!Array.isArray(saved)) {
         saved = [];
     }
+    if (!saved.includes('account')) saved.unshift('account');
     let order = [...new Set(saved.filter(key => defaults.includes(key)).concat(defaults))];
     const elements = Array.from(cards.children);
     elements.sort((a, b) => order.indexOf(a.dataset.deckCard) - order.indexOf(b.dataset.deckCard));
@@ -1326,6 +1374,19 @@ function setupCardSorting(cards) {
                     toolbar.append(button);
                 });
             const cardKey = card.dataset.deckCard;
+            const hideKeys = {account:'showAccountLinks', overview:'showStats', filters:'showLinks', profileNote:'showNote', globalNote:'globalNote', customLinks:'customLinks', favorites:'favorites'};
+            if (hideKeys[cardKey]) {
+                const hide = make('button', '', 'epic-hide'); hide.type = 'button';
+                setProfileLayoutIcon(hide, 'eyeOff');
+                hide.title = t('Hide deck section'); hide.setAttribute('aria-label', hide.title);
+                hide.addEventListener('click', event => {
+                    event.stopPropagation();
+                    localStorage.setItem('trophydeck.' + hideKeys[cardKey], 'false');
+                    logEvent('card.hide.' + cardKey);
+                    renderRail();
+                });
+                toolbar.append(hide);
+            }
             if (card.tagName === 'DETAILS') {
                 const summary=card.querySelector('summary');
                 summary.append(toolbar);
@@ -2344,6 +2405,12 @@ function setProfileLayoutEditing(editing) {
 }
 
 const profileLayoutIcons = {
+    accountUser:'M20 21v-2a7 7 0 0 0-14 0v2 M13 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+    accountList:'M8 6h12 M8 12h12 M8 18h12 M4 6h.01 M4 12h.01 M4 18h.01',
+    accountLog:'M5 4h14v16H5z M8 8h8 M8 12h8 M8 16h5',
+    accountAdvisor:'M12 3l2.4 5 5.5.8-4 4 .9 5.5-4.8-2.5-4.8 2.5.9-5.5-4-4 5.5-.8z',
+    accountStats:'M4 20V11 M10 20V5 M16 20v-7 M22 20H2',
+    accountRefresh:'M3 12a9 9 0 1 0 3-6.7 M3 3v6h6',
     edit: 'M12 20h9 M16.5 3.5a2.12 2.12 0 013 3L8 18l-4 1 1-4z',
     alignRight: 'M4 7h16 M4 12h16 M4 17h16 M15 4l4 3-4 3', alignLeft: 'M4 7h16 M4 12h16 M4 17h16 M9 4L5 7l4 3',
     done: 'M5 12l5 5L20 6', reset: 'M3 12a9 9 0 1 0 3-6.7 M3 3v6h6',
@@ -2396,7 +2463,7 @@ function setupProfileLayoutEditor() {
 
 const quickSettingGroups = [
     ['profile', 'Profile page', ['hideFlaggedBox', 'stickyNav', 'scrollButtons', 'cabinet', 'cabinetNames']],
-    ['deck', 'Deck sections', ['showStats', 'showLinks', 'showNote', 'globalNote', 'customLinks', 'favorites']],
+    ['deck', 'Deck sections', ['showAccountLinks', 'showStats', 'showLinks', 'showNote', 'globalNote', 'customLinks', 'favorites']],
     ['notes', 'Game notes', ['gameNotes', 'noteWrap']],
     ['appearance', 'Colors', ['psnpColors']],
     ['usage', 'Usage statistics', ['analytics']]
@@ -2517,6 +2584,9 @@ function renderRail() {
             cards.lastElementChild.dataset.deckCard = key;
         }
     }
+    if (enabled('trophydeck.showAccountLinks')) {
+        addCard('account', addAccountShortcuts);
+    }
     if (enabled('trophydeck.showStats')) {
         addCard('overview', addStats);
     }
@@ -2547,6 +2617,7 @@ function renderRail() {
         const controls = make('div', null, 'td-quick-group-controls');
         features.filter(feature => keys.includes(feature.key.replace('trophydeck.', '')))
             .forEach(feature => controls.append(toggleControl(feature)));
+        if (id === 'appearance') controls.append(make('small', t('Choose colors with the palette icon above or in All settings.'), 'td-quick-color-hint'));
         group.append(controls);
         group.addEventListener('toggle', () => {
             if (group.open) openQuickSettingGroups.add(id);
@@ -2571,6 +2642,9 @@ function renderRail() {
     root.append(panel);
     document.body.append(root);
     panel.scrollTop=previousScroll;
+    requestAnimationFrame(() => {
+        if (document.getElementById('trophydeck-rail') === root) panel.scrollTop=previousScroll;
+    });
     applyRailPosition();
 }
 
@@ -3082,6 +3156,26 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 #trophydeck-rail .td-quick-group { border:1px solid color-mix(in srgb,var(--td-accent) 65%,transparent); border-radius:4px; margin:6px 0; }
 #trophydeck-rail .epic-settings .td-quick-group > summary { display:list-item; padding:7px 9px; cursor:pointer; }
 #trophydeck-rail .td-quick-group-controls { padding:0 9px 5px; }
+/* High-contrast insertion markers stay visible regardless of the selected theme. */
+#content .td-profile-section { position:relative; }
+#content .td-profile-section.td-profile-drop-before::before,
+#content .td-profile-section.td-profile-drop-after::after {
+    content:''; position:absolute; z-index:20; left:0; right:0; height:8px;
+    background:repeating-linear-gradient(135deg,#111 0 6px,#ffe600 6px 12px);
+    border:1px solid #fff; box-shadow:0 0 0 1px #111; pointer-events:none;
+}
+#content .td-profile-section.td-profile-drop-before::before { top:0; }
+#content .td-profile-section.td-profile-drop-after::after { bottom:0; }
+#content .td-unified-grid.td-profile-drop-zone { outline:3px dashed #ffe600; outline-offset:-4px; box-shadow:inset 0 0 0 6px #111; }
+#trophydeck-rail .td-platform-section { border-top:1px solid color-mix(in srgb,var(--td-accent) 75%,white); margin-top:10px; padding-top:9px; }
+#trophydeck-rail .epic-panel { overflow-anchor:none; }
+#trophydeck-rail .epic-sort .epic-hide svg { display:block; width:16px; height:16px; }
+#trophydeck-rail .td-quick-color-hint { display:block; margin:6px 0 4px; color:#c4d6e5; line-height:1.4; }
+#trophydeck-rail .td-account-links { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(125px,100%),1fr)); gap:6px; }
+#trophydeck-rail .td-account-links a { display:flex; align-items:center; gap:7px; min-width:0; padding:7px; border-radius:3px; color:#e1f0ff; text-decoration:none; background:color-mix(in srgb,var(--td-accent) 32%,transparent); }
+#trophydeck-rail .td-account-links a:hover { background:var(--td-accent); }
+#trophydeck-rail .td-account-icon { display:flex; align-items:center; justify-content:center; flex:none; }
+#trophydeck-rail .td-account-icon svg { display:block; width:17px; height:17px; }
 `;
     document.head.append(style);
     applyTheme();
@@ -3129,6 +3223,16 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
             }
         });
     cabinetObserver.observe(document.body,{childList:true,subtree:true});
+    const accountMenu = document.querySelector('div.user-menu');
+    if (accountMenu) {
+        const signature = () => Array.from(accountMenu.querySelectorAll('div.user-nav a[href]')).map(link => link.getAttribute('href') + ':' + link.textContent.trim()).join('|');
+        let previousAccountMenu = signature();
+        const accountObserver = new MutationObserver(() => {
+            const current = signature();
+            if (current !== previousAccountMenu) { previousAccountMenu = current; renderRail(); }
+        });
+        accountObserver.observe(accountMenu, {childList:true, subtree:true});
+    }
     if (!addMenuItem()) {
         const observer = new MutationObserver(() => {
                 if (addMenuItem()) {

@@ -294,5 +294,18 @@ var __trophyDeckLocale_en = {
   "Move games to the left": "Move games to the left",
   "Use the edit icon beside the profile name. Drag sections around the three-column grid and use the width button to change their size. The reset icon appears while editing.": "Use the edit icon beside the profile name. Drag sections around the three-column grid and use the width button to change their size. The reset icon appears while editing.",
   "No games in the cabinet yet.": "No games in the cabinet yet.",
-  "Enable the game cabinet in settings.": "Enable the game cabinet in settings."
+  "Enable the game cabinet in settings.": "Enable the game cabinet in settings.",
+  "Account shortcuts in the deck": "Account shortcuts in the deck",
+  "Links to your own profile and account pages.": "Links to your own profile and account pages.",
+  "My account": "My account",
+  "My profile": "My profile",
+  "Game lists": "Game lists",
+  "Trophy log": "Trophy log",
+  "Trophy advisor": "Trophy advisor",
+  "Statistics": "Statistics",
+  "Update profile": "Update profile",
+  "Hide deck section": "Hide deck section",
+  "Choose colors with the palette icon above or in All settings.": "Choose colors with the palette icon above or in All settings.",
+  "When signed in, use the menu links to open your profile, game lists, trophies, statistics or profile update.": "When signed in, use the menu links to open your profile, game lists, trophies, statistics or profile update.",
+  "Click a section heading to expand or collapse it. Use the eye icon to hide a section and enable it again in settings; reorder sections using the handle or arrows.": "Click a section heading to expand or collapse it. Use the eye icon to hide a section and enable it again in settings; reorder sections using the handle or arrows."
 };
