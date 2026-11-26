@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.42
+// @version      1.0.43
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.42";
+const APP_VERSION = "1.0.43";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -374,8 +374,8 @@ function openSettings() {
     // IDs remain stable when the display language changes.
     const categories = [
         ['language', 'Language', []],
-        ['deck', 'Trophy Deck', ['showRail']],
         ['profile', "Profile page", ['stickyNav', 'hideFlaggedBox', 'scrollButtons']],
+        ['deck', 'Trophy Deck', ['showRail']],
         ['blocks', "Deck sections", ['showAccountLinks', 'showStats', 'showLinks', 'showNote', 'globalNote', 'customLinks', 'favorites', 'cabinet', 'cabinetNames']],
         ['notes', "Game notes", ['gameNotes', 'noteWrap']],
         ['colors', "Colors", ['psnpColors']],
@@ -642,7 +642,7 @@ function openSettings() {
     dock.addEventListener('change', () => {
         localStorage.setItem('trophydeck.horizontalAnchor', dock.value);
         logEvent('setting.horizontalAnchor');
-        applyRailPosition();
+        renderRail();
     });
     dockLabel.append(dock);
     positionGroup.append(dockLabel, make('small', t('Page edge places the sidebar beside the page. If there is not enough space, it stays visible and may cover part of the page.'), 'td-setting-description'));
@@ -2167,7 +2167,7 @@ function pageDockLeft(page, viewportWidth, panelWidth, tabWidth, isLeft, closed)
     const clamp = (value, max) => Math.max(0, Math.min(Math.max(0, max), value));
     if (closed) {
         const tabLeft = clamp(isLeft ? page.left - tabWidth : page.right, viewportWidth - tabWidth);
-        return isLeft ? tabLeft : tabLeft - panelWidth;
+        return tabLeft;
     }
     return clamp(isLeft ? page.left - total : page.right, viewportWidth - total);
 }
@@ -2189,11 +2189,18 @@ function applyRailHorizontalPosition(rail) {
         return;
     }
     const viewport = document.documentElement.clientWidth || window.innerWidth;
-    const left = pageDockLeft(page.getBoundingClientRect(), viewport, panel.offsetWidth, tab.offsetWidth,
+    const panelWidth = Math.max(0, Math.min(railWidth(), window.innerWidth * .45, window.innerWidth - 40));
+    const left = pageDockLeft(page.getBoundingClientRect(), viewport, panelWidth, tab.offsetWidth,
         rail.classList.contains('epic-left'), rail.classList.contains('epic-closed'));
     rail.classList.add('td-page-docked');
     rail.style.left = left + 'px';
     rail.style.right = 'auto';
+    const arrow = tab.querySelector('.epic-tab-arrow');
+    if (arrow) {
+        const isLeft = rail.classList.contains('epic-left');
+        const closed = rail.classList.contains('epic-closed');
+        arrow.textContent = isLeft ? (closed ? '«' : '»') : (closed ? '»' : '«');
+    }
 }
 
 function applyRailPosition() {
@@ -2826,7 +2833,7 @@ function renderRail() {
             applyRailHorizontalPosition(root);
         });
     updateTab();
-    root.addEventListener('transitionend', event => { if (event.propertyName === 'transform') updateRailOverlap(root); });
+    root.addEventListener('transitionend', event => { if (['transform', 'left', 'width'].includes(event.propertyName)) updateRailOverlap(root); });
     root.append(tab);
     const panel = make('div', null, 'epic-panel');
     const header = make('header', null, 'epic-header');
@@ -3606,6 +3613,16 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 #trophydeck-settings .td-profile-layout-hint { display:block; margin-top:18px; padding-top:14px; border-top:1px solid color-mix(in srgb,var(--td-accent) 60%,transparent); }
 #trophydeck-rail.td-page-docked { transition:transform .28s ease, left .28s ease; }
 @media (prefers-reduced-motion:reduce) { #trophydeck-rail.td-page-docked { transition:none; } }
+
+/* With a page anchor, the handle sits on the outer side of the panel. */
+#trophydeck-rail.td-page-docked { flex-direction:row-reverse; transform:none; }
+#trophydeck-rail.td-page-docked.epic-left { flex-direction:row; }
+#trophydeck-rail.td-page-docked .epic-tab { border-radius:0 6px 6px 0; }
+#trophydeck-rail.td-page-docked.epic-left .epic-tab { border-radius:6px 0 0 6px; }
+#trophydeck-rail.td-page-docked .epic-panel { flex:none; transition:width .28s ease, padding .28s ease, border-width .28s ease; }
+#trophydeck-rail.td-page-docked.epic-closed { transform:none; }
+#trophydeck-rail.td-page-docked.epic-closed .epic-panel { width:0 !important; padding-left:0; padding-right:0; border-left-width:0; border-right-width:0; overflow:hidden; visibility:hidden; transition:width .28s ease, padding .28s ease, border-width .28s ease, visibility 0s linear .28s; }
+@media (prefers-reduced-motion:reduce) { #trophydeck-rail.td-page-docked .epic-panel, #trophydeck-rail.td-page-docked.epic-closed .epic-panel { transition:none; } }
 `;
     document.head.append(style);
     applyTheme();
