@@ -342,5 +342,7 @@ var __trophyDeckLocale_en = {
   "Horizontal anchor: ": "Horizontal anchor: ",
   "Screen edge": "Screen edge",
   "Page edge": "Page edge",
-  "Page edge places the sidebar beside the page. If there is not enough space, it stays visible and may cover part of the page.": "Page edge places the sidebar beside the page. If there is not enough space, it stays visible and may cover part of the page."
+  "Page edge places the sidebar beside the page. If there is not enough space, it stays visible and may cover part of the page.": "Page edge places the sidebar beside the page. If there is not enough space, it stays visible and may cover part of the page.",
+  "Automatic (when space allows)": "Automatic (when space allows)",
+  "Automatic docks beside the page when the entire sidebar fits. Otherwise it stays at the screen edge. Page edge can overlap the page when space is tight.": "Automatic docks beside the page when the entire sidebar fits. Otherwise it stays at the screen edge. Page edge can overlap the page when space is tight."
 };

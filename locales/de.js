@@ -342,5 +342,7 @@ var __trophyDeckLocale_de = {
   "Horizontal anchor: ": "Seitlich andocken: ",
   "Screen edge": "Am Bildschirmrand",
   "Page edge": "Am Seitenrand",
-  "Page edge places the sidebar beside the page. If there is not enough space, it stays visible and may cover part of the page.": "Am Seitenrand steht die Seitenleiste direkt neben dem Inhalt. Reicht der Platz nicht aus, bleibt sie sichtbar und kann einen Teil der Seite überdecken."
+  "Page edge places the sidebar beside the page. If there is not enough space, it stays visible and may cover part of the page.": "Am Seitenrand steht die Seitenleiste direkt neben dem Inhalt. Reicht der Platz nicht aus, bleibt sie sichtbar und kann einen Teil der Seite überdecken.",
+  "Automatic (when space allows)": "Automatisch (wenn genug Platz ist)",
+  "Automatic docks beside the page when the entire sidebar fits. Otherwise it stays at the screen edge. Page edge can overlap the page when space is tight.": "Automatisch dockt neben der Seite an, wenn die gesamte Seitenleiste Platz hat. Andernfalls bleibt sie am Bildschirmrand. Bei „Am Seitenrand“ kann sie die Seite bei Platzmangel überdecken."
 };
