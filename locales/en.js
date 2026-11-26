@@ -317,5 +317,9 @@ var __trophyDeckLocale_en = {
   "Drag to move this link": "Drag to move this link",
   "Show categories": "Show categories",
   "Hide categories": "Hide categories",
-  "Player color": "Player color"
+  "Player color": "Player color",
+  "Already in favorites": "Already in favorites",
+  "+ Current player": "+ Current player",
+  "This player is already in your favorites.": "This player is already in your favorites.",
+  "Add the currently viewed player.": "Add the currently viewed player."
 };

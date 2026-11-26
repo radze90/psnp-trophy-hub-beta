@@ -317,5 +317,9 @@ var __trophyDeckLocale_de = {
   "Drag to move this link": "Link zum Verschieben ziehen",
   "Show categories": "Kategorien anzeigen",
   "Hide categories": "Kategorien ausblenden",
-  "Player color": "Spielerfarbe"
+  "Player color": "Spielerfarbe",
+  "Already in favorites": "Bereits favorisiert",
+  "+ Current player": "+ Aktueller Spieler",
+  "This player is already in your favorites.": "Dieser Spieler ist bereits in deinen Favoriten.",
+  "Add the currently viewed player.": "Aktuell geöffneten Spieler hinzufügen."
 };

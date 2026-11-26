@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.31
+// @version      1.0.34
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.31";
+const APP_VERSION = "1.0.34";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -472,23 +472,7 @@ function openSettings() {
     }drawSwatches();
     theme.addEventListener('change',drawSwatches);
     sections.colors.append(swatches);
-    const customColors = make('div', null, 'td-custom-colors');
-    customColors.append(make('strong', t('Custom colors')));
-    [['Background', 0], ['Cards', 1], ['Accent', 2]].forEach(([label, index]) => {
-        const field = make('label', t(label));
-        const input = make('input'); input.type = 'color'; input.value = themes.Custom[index];
-        input.setAttribute('aria-label', t(label));
-        input.addEventListener('input', () => {
-            const colors = readCustomTheme(); colors[index] = input.value;
-            localStorage.setItem('trophydeck.customTheme', JSON.stringify(colors));
-            themes.Custom = colors; theme.value = 'Custom';
-            localStorage.setItem('trophydeck.theme', 'Custom');
-            applyTheme(); drawSwatches();
-        });
-        input.addEventListener('change', () => logEvent('theme.custom'));
-        field.append(input); customColors.append(field);
-    });
-    sections.colors.append(customColors);
+    sections.colors.append(createCustomColorControls(() => { theme.value = 'Custom'; drawSwatches(); }));
     const reset = make('button', t("Reset section order"), 'epic-button');
     reset.type='button';
     reset.addEventListener('click', () => {
@@ -694,6 +678,28 @@ function openSettings() {
     dialog.showModal();
 }
 
+// Shared by the full settings and the palette shortcut in Trophy Deck.
+function createCustomColorControls(onChange = () => {}) {
+    themes.Custom = readCustomTheme();
+    const container = make('div', null, 'td-custom-colors');
+    container.append(make('strong', t('Custom colors')));
+    [['Background', 0], ['Cards', 1], ['Accent', 2]].forEach(([label, index]) => {
+        const field = make('label', t(label));
+        const input = make('input'); input.type = 'color'; input.value = themes.Custom[index];
+        input.setAttribute('aria-label', t(label));
+        input.addEventListener('input', () => {
+            const colors = readCustomTheme(); colors[index] = input.value;
+            localStorage.setItem('trophydeck.customTheme', JSON.stringify(colors));
+            themes.Custom = colors;
+            localStorage.setItem('trophydeck.theme', 'Custom');
+            applyTheme(); onChange();
+        });
+        input.addEventListener('change', () => logEvent('theme.custom'));
+        field.append(input); container.append(field);
+    });
+    return container;
+}
+
 function openThemePicker() {
     if(document.getElementById('trophydeck-theme-picker')){
         return;
@@ -726,7 +732,7 @@ function openThemePicker() {
             });
     }
     draw();
-    dialog.append(grid);
+    dialog.append(grid, createCustomColorControls(draw));
     dialog.addEventListener('close',()=>dialog.remove());
     document.body.append(dialog);
     prepareDialog(dialog);
@@ -1695,7 +1701,27 @@ function addFavorites(panel) {
                 draw();
             });
         const actions=make('div',null,'td-favorite-actions');
-        actions.append(add,edit);
+        actions.append(add);
+        let currentName = '';
+        try { currentName = decodeURIComponent((profileInfo()?.path || '').replace(/^\//, '')); } catch (_) {}
+        if (/^[a-zA-Z0-9_-]{1,16}$/.test(currentName)) {
+            const alreadyAdded = list.some(name => name.toLowerCase() === currentName.toLowerCase());
+            const current = make('button', t(alreadyAdded ? 'Already in favorites' : '+ Current player'), 'td-link-button td-fav-current');
+            current.type = 'button'; current.disabled = alreadyAdded;
+            current.title = t(alreadyAdded ? 'This player is already in your favorites.' : 'Add the currently viewed player.');
+            current.setAttribute('aria-label', current.title);
+            current.addEventListener('click', () => {
+                const latest = readList('trophydeck.favoritePlayers');
+                if (!latest.some(name => name.toLowerCase() === currentName.toLowerCase())) {
+                    latest.push(currentName);
+                    localStorage.setItem('trophydeck.favoritePlayers', JSON.stringify(latest));
+                    logEvent('favorites.addCurrent');
+                }
+                draw();
+            });
+            actions.append(current);
+        }
+        actions.append(edit);
         body.append(actions);
     } draw();
     box.append(body);
@@ -2499,6 +2525,7 @@ function setProfileLayoutEditing(editing) {
         button.setAttribute('aria-label', button.title);
         button.setAttribute('aria-pressed', String(editing));
         bar.querySelector('.td-profile-layout-reset').hidden = !editing;
+        if (bar.parentElement?.classList.contains('td-profile-nav-controls-host')) bar.parentElement.classList.toggle('td-profile-nav-editing', editing);
     });
     areas.grid.classList.toggle('td-profile-edit-zone', editing);
     installProfileDropZone(areas.grid);
@@ -2564,19 +2591,10 @@ function setupProfileLayoutEditor() {
     if (!areas) return;
     const profile = profileInfo();
     const nav = profile?.nav;
-    const heading = nav?.closest('.title-bar')?.querySelector('h3');
-    if (heading?.parentElement) {
-        const group = heading.parentElement;
-        group.classList.add('td-profile-title-group');
-        if (!group.querySelector('.td-profile-nav-avatar')) {
-            const avatar = createProfileNavigationAvatar();
-            if (avatar) heading.before(avatar);
-        }
-    }
-    if (nav && !document.getElementById('td-profile-layout-bar')) {
-        const item = make('li', null, 'td-profile-layout-nav-item');
-        item.append(makeProfileLayoutControls('td-profile-layout-bar'));
-        nav.append(item);
+    const host = nav?.parentElement;
+    if (host && !document.getElementById('td-profile-layout-bar')) {
+        host.classList.add('td-profile-nav-controls-host');
+        host.append(makeProfileLayoutControls('td-profile-layout-bar'));
     }
     const sticky = document.getElementById('trophydeck-sticky');
     if (sticky && !sticky.querySelector('[data-td-layout-controls]')) sticky.append(makeProfileLayoutControls());
@@ -3368,6 +3386,15 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 .td-profile-nav-avatar { display:block; width:32px; height:32px; flex:none; object-fit:cover; border-radius:4px; }
 .title-bar .navigation .td-profile-layout-nav-item { display:inline-flex; align-items:center; vertical-align:middle; }
 #trophydeck-sticky > .td-profile-layout-bar { flex:none; margin-left:4px; }
+/* The site navigation keeps its original line box and vertical alignment. */
+.title-bar .td-profile-nav-controls-host { position:relative; padding-right:40px; }
+.title-bar .td-profile-nav-controls-host.td-profile-nav-editing { padding-right:76px; }
+.title-bar .td-profile-nav-controls-host > #td-profile-layout-bar { position:absolute; right:0; top:50%; transform:translateY(-50%); margin:0; }
+#trophydeck-rail .td-favorite-actions .td-fav-current { opacity:1; pointer-events:auto; }
+#trophydeck-rail .td-favorite-actions .td-fav-current:disabled { opacity:.55; cursor:default; }
+#trophydeck-theme-picker .td-custom-colors { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:16px; }
+#trophydeck-theme-picker .td-custom-colors label { display:flex; align-items:center; gap:6px; margin:0; }
+#trophydeck-theme-picker .td-custom-colors input[type="color"] { width:34px; height:28px; padding:0; margin:0; border:0; cursor:pointer; background:transparent; }
 `;
     document.head.append(style);
     applyTheme();
