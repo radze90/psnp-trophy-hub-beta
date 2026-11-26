@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.30
+// @version      1.0.31
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.30";
+const APP_VERSION = "1.0.31";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -917,6 +917,15 @@ function copyTypography(source, target) {
         });
 }
 
+function createProfileNavigationAvatar() {
+    const source = document.querySelector('#user-bar .avatar img');
+    if (!source || !(source.currentSrc || source.src)) return null;
+    const image = make('img', null, 'td-profile-nav-avatar');
+    image.src = source.currentSrc || source.src;
+    image.alt = '';
+    return image;
+}
+
 let stickyController = new AbortController();
 
 function updateStickyNav() {
@@ -946,6 +955,8 @@ function updateStickyNav() {
         copyTypography(heading, title);
         title.style.margin = '0';
         const titleGroup = make('div', null, 'td-sticky-title');
+        const avatar = createProfileNavigationAvatar();
+        if (avatar) titleGroup.append(avatar);
         titleGroup.append(title);
         sticky.append(titleGroup);
     }
@@ -1099,7 +1110,7 @@ function addCustomLinks(panel) {
                 row.addEventListener('dragleave',()=>row.classList.remove('td-link-drop'));
                 row.addEventListener('drop',event=>{if(dragging===null)return;event.preventDefault();event.stopPropagation();row.classList.remove('td-link-drop');moveLink(index,category);});
                 const a=make('a',item.text);a.href=item.url;a.target='_blank';a.rel='noopener noreferrer';a.addEventListener('click',()=>logEvent('customLinks.open'));
-                row.append(drag,a,btn('✎','Edit link',async()=>{const updated=await askLink(item,category);if(updated){data.links[index]=updated;save(data);}},true),btn('×','Delete link',async()=>{if(await tdDialog(t('Delete link'),[],t('Delete this link?'))){data.links.splice(index,1);save(data);}},true));
+                row.append(a,drag,btn('✎','Edit link',async()=>{const updated=await askLink(item,category);if(updated){data.links[index]=updated;save(data);}},true),btn('×','Delete link',async()=>{if(await tdDialog(t('Delete link'),[],t('Delete this link?'))){data.links.splice(index,1);save(data);}},true));
                 section.append(row);
             });
             section.addEventListener('dragover',event=>{if(dragging!==null)event.preventDefault();});
@@ -1483,7 +1494,7 @@ function tdDialog(title, fields = [], message = '') {
                     const label=make('label',field.label);
                     const input=make(field.options ? 'select' : 'input');
                     if (field.options) field.options.forEach(option => { const element=make('option', option.label); element.value=option.value; input.append(element); });
-                    else { input.type=field.type||'text'; input.maxLength=field.max||2048; }
+                    else { input.type=field.type||'text'; if (input.type !== 'color') input.maxLength=field.max||2048; }
                     input.value=field.value||'';
                     input.required=field.required!==false;
                     label.append(input);
@@ -1600,7 +1611,11 @@ function addFavorites(panel) {
                 color.title=t('Player color'); color.setAttribute('aria-label',t('Player color') + ': ' + name);
                 color.addEventListener('input', () => { favoriteColors[name.toLowerCase()]=color.value; saveColors(); tile.style.setProperty('--td-favorite-color',color.value); });
                 color.addEventListener('change', () => { logEvent('favorites.color'); draw(); });
-                controls.append(color);
+                const colorControl = make('label', null, 'td-favorite-color-control');
+                colorControl.title = t('Player color');
+                const colorIcon = make('span', null, 'td-favorite-color-icon');
+                setProfileLayoutIcon(colorIcon, 'palette'); colorIcon.setAttribute('aria-hidden', 'true');
+                colorControl.append(colorIcon, color); controls.prepend(colorControl);
                 const del=make('button','×','td-link-button');
                 del.type='button';
                 del.setAttribute('aria-label',name+t(" remove"));
@@ -1649,7 +1664,15 @@ function addFavorites(panel) {
         const add=make('button',t("+ Player"),'td-link-button td-fav-add');
         add.type='button';
         add.addEventListener('click',async()=>{
-                const answer=await tdDialog(t("Add player"),[{label:'PSN-ID',max:16}]);
+                let defaultColor = '#315c89';
+                try {
+                    const accent = getComputedStyle(document.documentElement).getPropertyValue('--td-accent').trim();
+                    if (/^#[0-9a-f]{6}$/i.test(accent)) defaultColor = accent;
+                } catch (_) {}
+                const answer=await tdDialog(t('Add player'),[
+                    {label:'PSN-ID',max:16},
+                    {label:t('Player color'),type:'color',value:defaultColor,required:false}
+                ]);
                 if(!answer){
                     return;
                 }
@@ -1660,6 +1683,7 @@ function addFavorites(panel) {
                 }
                 if(!list.some(n=>n.toLowerCase()===name.toLowerCase())){
                     list.push(name);
+                    if (/^#[0-9a-f]{6}$/i.test(answer[1] || '')) { favoriteColors[name.toLowerCase()] = answer[1]; saveColors(); }
                     persist();
                 }
             });
@@ -1936,15 +1960,26 @@ function railRectanglesIntersect(a, b) {
         a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top);
 }
 
+function positionPsnpProfileMenu(rail) {
+    const railRect = rail?.getBoundingClientRect();
+    const canMove = rail && rail.classList.contains('epic-left') && !rail.classList.contains('epic-closed');
+    document.querySelectorAll('.psnpp-floating-menu').forEach(menu => {
+        const isProfileMenu = Array.from(menu.querySelectorAll('a')).some(link => link.textContent.trim().toLowerCase() === 'update profile');
+        if (!isProfileMenu) return;
+        const bounds = menu.getBoundingClientRect();
+        const originalLeft = parseFloat(menu.style.left);
+        const left = Number.isFinite(originalLeft) ? originalLeft : 20;
+        const originalBounds = {left, right:left+bounds.width, top:bounds.top, bottom:bounds.bottom, width:bounds.width, height:bounds.height};
+        menu.classList.toggle('td-psnpp-menu-right', !!canMove && railRectanglesIntersect(railRect, originalBounds));
+    });
+}
+
 function updateRailOverlap(rail = document.getElementById('trophydeck-rail')) {
-    if (!rail || !rail.classList.contains('epic-left')) {
-        if (rail) rail.classList.remove('td-rail-overlap');
-        return;
-    }
+    positionPsnpProfileMenu(rail);
+    if (!rail) return;
     const tab = rail.querySelector('.epic-tab');
     if (!tab) return;
     const tabRect = tab.getBoundingClientRect();
-    const railRect = rail.getBoundingClientRect();
     const profile = profileInfo();
     const nav = profile?.nav.closest('.title-bar');
     const sticky = document.getElementById('trophydeck-sticky');
@@ -1953,7 +1988,7 @@ function updateRailOverlap(rail = document.getElementById('trophydeck-rail')) {
     const menuOverlap = Array.from(document.querySelectorAll('.psnpp-floating-menu')).some(element => {
         const style = getComputedStyle(element);
         if (element.hidden || style.display === 'none' || style.visibility === 'hidden') return false;
-        return railRectanglesIntersect(railRect, element.getBoundingClientRect());
+        return railRectanglesIntersect(tabRect, element.getBoundingClientRect());
     });
     rail.classList.toggle('td-rail-overlap', headerOverlap || menuOverlap);
 }
@@ -2528,10 +2563,23 @@ function setupProfileLayoutEditor() {
     const areas = profileLayoutAreas();
     if (!areas) return;
     const profile = profileInfo();
-    const heading = profile?.nav.closest('.title-bar')?.querySelector('h3');
-    if (heading?.parentElement && !document.getElementById('td-profile-layout-bar')) heading.parentElement.append(makeProfileLayoutControls('td-profile-layout-bar'));
-    const stickyTitle = document.querySelector('#trophydeck-sticky .td-sticky-title');
-    if (stickyTitle && !stickyTitle.querySelector('[data-td-layout-controls]')) stickyTitle.append(makeProfileLayoutControls());
+    const nav = profile?.nav;
+    const heading = nav?.closest('.title-bar')?.querySelector('h3');
+    if (heading?.parentElement) {
+        const group = heading.parentElement;
+        group.classList.add('td-profile-title-group');
+        if (!group.querySelector('.td-profile-nav-avatar')) {
+            const avatar = createProfileNavigationAvatar();
+            if (avatar) heading.before(avatar);
+        }
+    }
+    if (nav && !document.getElementById('td-profile-layout-bar')) {
+        const item = make('li', null, 'td-profile-layout-nav-item');
+        item.append(makeProfileLayoutControls('td-profile-layout-bar'));
+        nav.append(item);
+    }
+    const sticky = document.getElementById('trophydeck-sticky');
+    if (sticky && !sticky.querySelector('[data-td-layout-controls]')) sticky.append(makeProfileLayoutControls());
 }
 
 
@@ -2539,8 +2587,7 @@ const quickSettingGroups = [
     ['profile', 'Profile page', ['hideFlaggedBox', 'stickyNav', 'scrollButtons', 'cabinet', 'cabinetNames']],
     ['deck', 'Deck sections', ['showAccountLinks', 'showStats', 'showLinks', 'showNote', 'globalNote', 'customLinks', 'favorites']],
     ['notes', 'Game notes', ['gameNotes', 'noteWrap']],
-    ['appearance', 'Colors', ['psnpColors']],
-    ['usage', 'Usage statistics', ['analytics']]
+    ['appearance', 'Colors', ['psnpColors']]
 ];
 
 const openQuickSettingGroups = new Set();
@@ -2552,6 +2599,7 @@ function renderRail() {
         old.remove();
     }
     if (!enabled('trophydeck.showRail')) {
+        updateRailOverlap(null);
         return;
     }
     const root = make('aside');
@@ -2682,9 +2730,6 @@ function renderRail() {
     }
     if (enabled('trophydeck.favorites')) {
         addCard('favorites', addFavorites);
-    }
-    if (!profile) {
-        panelScroll.append(make('p', t("Open a profile for progress, quick filters and profile notes."), 'epic-muted'));
     }
     const settings = make('section', null, 'epic-card epic-settings');
     settings.append(make('h3', t("Quick settings")));
@@ -3293,8 +3338,7 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 #trophydeck-rail .epic-panel-scroll::-webkit-scrollbar-track { background:var(--td-base); }
 #trophydeck-rail .epic-panel-scroll::-webkit-scrollbar-thumb { background:var(--td-accent); border:2px solid var(--td-base); border-radius:8px; }
 /* Fade a left-side deck only while it actually covers profile navigation or a PSNP+ menu. */
-#trophydeck-rail { transition:transform .28s ease, opacity .2s ease; }
-#trophydeck-rail.epic-left.td-rail-overlap:not(:hover):not(:focus-within) { opacity:.14; }
+#trophydeck-rail { transition:transform .28s ease; }
 @media (prefers-reduced-motion:reduce) { #trophydeck-rail { transition:none; } }
 /* Only the inner content area owns a scrollbar, never the dialog frame. */
 #trophydeck-settings.td-scroll-dialog,
@@ -3310,6 +3354,20 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
     background:var(--td-accent); border-radius:0 4px 0 0; pointer-events:none;
 }
 .td-scroll-dialog > h2 > .td-dialog-close { z-index:1; }
+/* Only the tab fades. The open deck stays fully readable on either side. */
+#trophydeck-rail .epic-tab { transition:opacity .2s ease; }
+#trophydeck-rail.td-rail-overlap .epic-tab:not(:hover):not(:focus-visible) { opacity:.14; }
+.psnpp-floating-menu.td-psnpp-menu-right { left:auto !important; right:20px !important; }
+@media (prefers-reduced-motion:reduce) { #trophydeck-rail .epic-tab { transition:none; } }
+/* Favorite color control uses a palette glyph with the native picker above it. */
+#trophydeck-rail .td-favorite-color-control { position:relative; display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; cursor:pointer; }
+#trophydeck-rail .td-favorite-color-icon svg { display:block; width:15px; height:15px; color:var(--td-favorite-text,#fff); }
+#trophydeck-rail .td-favorite-color-control input.td-favorite-color { position:absolute; inset:0; width:100%; height:100%; padding:0; margin:0; opacity:0; cursor:pointer; }
+.td-dialog-scroll label select { margin-left:8px; }
+.title-bar .td-profile-title-group { display:flex; align-items:center; gap:8px; min-width:0; }
+.td-profile-nav-avatar { display:block; width:32px; height:32px; flex:none; object-fit:cover; border-radius:4px; }
+.title-bar .navigation .td-profile-layout-nav-item { display:inline-flex; align-items:center; vertical-align:middle; }
+#trophydeck-sticky > .td-profile-layout-bar { flex:none; margin-left:4px; }
 `;
     document.head.append(style);
     applyTheme();
