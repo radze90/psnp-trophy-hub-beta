@@ -332,5 +332,11 @@ var __trophyDeckLocale_de = {
   "Set how much space the open sidebar uses.": "Lege fest, wie viel Platz die geöffnete Seitenleiste einnimmt.",
   "The sidebar stays at the same height in the browser window while you scroll.": "Die Seitenleiste bleibt beim Scrollen an derselben Stelle im Browserfenster.",
   "The sidebar moves with the page until it reaches the top, then stays visible.": "Die Seitenleiste bewegt sich mit der Seite nach oben und bleibt anschließend sichtbar.",
-  "Distance from the top of the browser window. You can also drag the sidebar header up or down.": "Abstand zum oberen Rand des Browserfensters. Du kannst die Seitenleiste auch an ihrer Überschrift nach oben oder unten ziehen."
+  "Distance from the top of the browser window. You can also drag the sidebar header up or down.": "Abstand zum oberen Rand des Browserfensters. Du kannst die Seitenleiste auch an ihrer Überschrift nach oben oder unten ziehen.",
+  "Page position: ": "Seitenposition: ",
+  "Page position": "Seitenposition",
+  "Centered": "Zentriert",
+  "left": "nach links",
+  "right": "nach rechts",
+  "Moves the page within the available empty space without changing its width. Centered keeps the original layout.": "Verschiebt die Seite innerhalb des freien Platzes, ohne ihre Breite zu ändern. Zentriert entspricht der ursprünglichen Anordnung."
 };

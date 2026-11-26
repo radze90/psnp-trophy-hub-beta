@@ -332,5 +332,11 @@ var __trophyDeckLocale_en = {
   "Set how much space the open sidebar uses.": "Set how much space the open sidebar uses.",
   "The sidebar stays at the same height in the browser window while you scroll.": "The sidebar stays at the same height in the browser window while you scroll.",
   "The sidebar moves with the page until it reaches the top, then stays visible.": "The sidebar moves with the page until it reaches the top, then stays visible.",
-  "Distance from the top of the browser window. You can also drag the sidebar header up or down.": "Distance from the top of the browser window. You can also drag the sidebar header up or down."
+  "Distance from the top of the browser window. You can also drag the sidebar header up or down.": "Distance from the top of the browser window. You can also drag the sidebar header up or down.",
+  "Page position: ": "Page position: ",
+  "Page position": "Page position",
+  "Centered": "Centered",
+  "left": "left",
+  "right": "right",
+  "Moves the page within the available empty space without changing its width. Centered keeps the original layout.": "Moves the page within the available empty space without changing its width. Centered keeps the original layout."
 };

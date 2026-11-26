@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.40
+// @version      1.0.41
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.40";
+const APP_VERSION = "1.0.41";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -395,6 +395,30 @@ function openSettings() {
         dialog.append(section);
     });
 
+    const pagePositionLabel = make('label', t('Page position: '), 'epic-width');
+    const pagePositionValue = make('span');
+    const pagePosition = make('input');
+    pagePosition.type = 'range';
+    pagePosition.min = '-100';
+    pagePosition.max = '100';
+    pagePosition.step = '5';
+    pagePosition.value = localStorage.getItem('trophydeck.pagePosition') || '0';
+    pagePosition.setAttribute('aria-label', t('Page position'));
+    function updatePagePositionValue() {
+        const value = Number(pagePosition.value);
+        pagePositionValue.textContent = value === 0 ? t('Centered') : Math.abs(value) + '% ' + t(value < 0 ? 'left' : 'right');
+    }
+    pagePosition.addEventListener('input', () => {
+        localStorage.setItem('trophydeck.pagePosition', pagePosition.value);
+        updatePagePositionValue();
+        applyPagePosition();
+        window.dispatchEvent(new Event('scroll'));
+    });
+    pagePosition.addEventListener('change', () => logEvent('setting.pagePosition'));
+    updatePagePositionValue();
+    pagePositionLabel.append(pagePositionValue, pagePosition);
+    sections.profile.append(pagePositionLabel, make('small', t('Moves the page within the available empty space without changing its width. Centered keeps the original layout.'), 'td-setting-description'));
+
     const layoutHint = make('small', t('Use “Edit profile layout” on a profile page to move or hide sections.'), 'epic-muted');
     const layoutReset = make('button', t('Restore profile layout'), 'epic-button');
     layoutReset.type = 'button';
@@ -549,15 +573,27 @@ function openSettings() {
     const sizeGroup = make('div', null, 'td-deck-settings-group');
     function deckGroupHeading(group, symbol, title, description) {
         const heading = make('div', null, 'td-deck-group-heading');
-        const icon = make('span', symbol, 'td-deck-group-icon');
+        const icon = make('span', null, 'td-deck-group-icon');
+        const glyph = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        glyph.setAttribute('viewBox', '0 0 24 24');
+        glyph.setAttribute('aria-hidden', 'true');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', symbol === 'horizontal' ? 'M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4' : 'M12 4v16M8 8l4-4 4 4M8 16l4 4 4-4');
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', 'currentColor');
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linejoin', 'round');
+        glyph.append(path);
+        icon.append(glyph);
         icon.setAttribute('aria-hidden', 'true');
         const copy = make('div');
         copy.append(make('strong', t(title)), make('small', t(description), 'td-setting-description'));
         heading.append(icon, copy);
         group.append(heading);
     }
-    deckGroupHeading(positionGroup, '↔', 'Position and scrolling', 'Choose a screen edge and how the sidebar follows you.');
-    deckGroupHeading(sizeGroup, '↕', 'Size', 'Set how much space the open sidebar uses.');
+    deckGroupHeading(positionGroup, 'horizontal', 'Position and scrolling', 'Choose a screen edge and how the sidebar follows you.');
+    deckGroupHeading(sizeGroup, 'vertical', 'Size', 'Set how much space the open sidebar uses.');
     sections.deck.append(positionGroup, sizeGroup);
     const widthLabel = make('label', t("Trophy Deck width: "), 'epic-width');
     const widthValue = make('span', railWidth() + ' px');
@@ -815,6 +851,33 @@ function openFeatureGuide() {
     dialog.showModal();
 }
 
+
+// Move only centered page-width wrappers. Their layout width stays unchanged.
+function pageShiftPixels(viewportWidth, elementWidth, position) {
+    const freeSpace = Math.max(0, (viewportWidth - elementWidth) / 2);
+    const amount = Math.max(-100, Math.min(100, Number(position) || 0));
+    return freeSpace * amount / 100;
+}
+
+function applyPagePosition() {
+    const position = Math.max(-100, Math.min(100, Number(localStorage.getItem('trophydeck.pagePosition')) || 0));
+    const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+    const elements = Array.from(document.querySelectorAll('.width'));
+    elements.forEach(element => {
+        element.classList.remove('td-page-shifted');
+        element.style.removeProperty('--td-page-offset');
+    });
+    if (!position) return;
+    elements.forEach(element => {
+        if (element.parentElement && element.parentElement.closest('.width')) return;
+        const rect = element.getBoundingClientRect();
+        if (rect.width < Math.min(500, viewportWidth * .6) || Math.abs(rect.left + rect.right - viewportWidth) > 8) return;
+        const offset = pageShiftPixels(viewportWidth, rect.width, position);
+        if (!offset) return;
+        element.style.setProperty('--td-page-offset', offset + 'px');
+        element.classList.add('td-page-shifted');
+    });
+}
 
 function profileInfo() {
     const stats = document.querySelector('.stats.flex');
@@ -1226,8 +1289,7 @@ function maxRailWidth() {
 }
 
 function recommendedRailWidth() {
-    const recommended = Math.round(Math.min(700, Math.max(310, window.innerWidth * 0.18)) / 10) * 10;
-    return Math.max(260, Math.min(maxRailWidth(), recommended));
+    return Math.max(260, Math.min(maxRailWidth(), 380));
 }
 
 function railWidth() {
@@ -3482,9 +3544,15 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 #trophydeck-settings .td-deck-group-icon { display:flex; align-items:center; justify-content:center; flex:none; width:30px; height:30px; border-radius:4px; background:var(--td-accent); color:#fff; font-size:20px; line-height:1; }
 #trophydeck-settings .td-deck-settings-group .epic-width { margin-top:12px; }
 #trophydeck-settings .td-deck-settings-group .td-setting-description { font-size:12px; }
+
+/* Shift centered site wrappers without changing their layout width. */
+.width.td-page-shifted { position:relative; left:var(--td-page-offset, 0px) !important; }
+#trophydeck-settings .td-deck-group-icon { padding:0; line-height:0; }
+#trophydeck-settings .td-deck-group-icon svg { display:block; width:20px; height:20px; flex:none; }
 `;
     document.head.append(style);
     applyTheme();
+    applyPagePosition();
     migrateGameNotes();
     updateFlagged();
     renderRail();
@@ -3504,6 +3572,7 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
     window.addEventListener('scroll', pauseProfileAutoloadForScroll, {capture:true, passive:true});
     window.addEventListener('scroll',applyRailPosition,{passive:true});
     window.addEventListener('resize',()=>{
+            applyPagePosition();
             const rail=document.getElementById('trophydeck-rail');
             if(rail){
                 rail.style.setProperty('--epic-width',railWidth()+'px');
