@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.25
+// @version      1.0.26
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.25";
+const APP_VERSION = "1.0.26";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -2047,9 +2047,16 @@ function scheduleProfileGrid() {
         profileGridFrame = 0;
         const grid = document.querySelector('[data-td-unified-grid]');
         if (!grid) return;
-        Array.from(grid.children).forEach(section => {
-            if (!section.dataset.tdProfileSection || section.hidden) return;
-            const span = 'span ' + Math.max(1, Math.ceil(section.getBoundingClientRect().height / 16));
+        const heights = Array.from(grid.children)
+            .filter(section => section.dataset.tdProfileSection && !section.hidden)
+            .map(section => [section, section.getBoundingClientRect().height]);
+        // Finer tracks preserve the site's spacing; cap the total implicit tracks
+        // for very long profiles so browser grid limits are not exceeded.
+        const unit = Math.max(1, Math.ceil(heights.reduce((sum, entry) => sum + entry[1], 0) / 8000));
+        const unitValue = unit + 'px';
+        if (grid.style.gridAutoRows !== unitValue) grid.style.gridAutoRows = unitValue;
+        heights.forEach(([section, height]) => {
+            const span = 'span ' + Math.max(1, Math.ceil(height / unit));
             if (section.style.gridRowEnd !== span) section.style.gridRowEnd = span;
         });
     });
@@ -2387,6 +2394,16 @@ function setupProfileLayoutEditor() {
 }
 
 
+const quickSettingGroups = [
+    ['profile', 'Profile page', ['hideFlaggedBox', 'stickyNav', 'scrollButtons', 'cabinet', 'cabinetNames']],
+    ['deck', 'Deck sections', ['showStats', 'showLinks', 'showNote', 'globalNote', 'customLinks', 'favorites']],
+    ['notes', 'Game notes', ['gameNotes', 'noteWrap']],
+    ['appearance', 'Colors', ['psnpColors']],
+    ['usage', 'Usage statistics', ['analytics']]
+];
+
+const openQuickSettingGroups = new Set();
+
 function renderRail() {
     const old = document.getElementById('trophydeck-rail');
     const previousScroll=old?.querySelector('.epic-panel')?.scrollTop || 0;
@@ -2523,7 +2540,20 @@ function renderRail() {
     }
     const settings = make('section', null, 'epic-card epic-settings');
     settings.append(make('h3', t("Quick settings")));
-    features.filter(feature => feature.key !== 'trophydeck.showRail').forEach(feature => settings.append(toggleControl(feature)));
+    quickSettingGroups.forEach(([id, name, keys]) => {
+        const group = make('details', null, 'td-quick-group');
+        group.open = openQuickSettingGroups.has(id);
+        group.append(make('summary', t(name)));
+        const controls = make('div', null, 'td-quick-group-controls');
+        features.filter(feature => keys.includes(feature.key.replace('trophydeck.', '')))
+            .forEach(feature => controls.append(toggleControl(feature)));
+        group.append(controls);
+        group.addEventListener('toggle', () => {
+            if (group.open) openQuickSettingGroups.add(id);
+            else openQuickSettingGroups.delete(id);
+        });
+        settings.append(group);
+    });
     const manageNotes = make('button', t("Manage notes"), 'epic-button');
     manageNotes.type='button';
     manageNotes.addEventListener('click', openNotesManager);
@@ -2915,7 +2945,7 @@ html.trophydeck-psnp-colors a.scroll-top { background-color:var(--td-accent) !im
 #td-profile-layout-bar { position:static; display:inline-flex; vertical-align:middle; gap:3px; padding:0; margin-left:8px; background:transparent; }
 #td-profile-layout-bar button { display:inline-flex; align-items:center; justify-content:center; width:29px; height:29px; padding:0; font-size:18px; line-height:1; }
 #td-profile-layout-bar button[hidden] { display:none !important; }
-#td-profile-layout-bar button[aria-pressed="true"] { box-shadow:0 0 0 2px var(--td-accent); }
+
 @media (max-width:800px) { #content .row.td-profile-grid { grid-template-columns:minmax(0,1fr); } #content .td-profile-grid > .col-xs-8 { grid-column:1 / -1 !important; order:0; } }
 .title-bar .grow:has(> #td-profile-layout-bar) { display:flex; align-items:center; }
 .td-profile-edit-zone::before { content:attr(data-td-drop-label); display:block; padding:3px 6px; font:600 11px/1.3 Arial,sans-serif; color:var(--td-accent,#315c89); background:color-mix(in srgb,white 85%,var(--td-accent)); }
@@ -3038,6 +3068,20 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 #content > .td-unified-grid.row { margin:0; }
 #content > .td-unified-grid.td-profile-edit-zone .td-profile-milestone-overflow { display:none !important; }
 .td-cabinet-placeholder { margin:0; padding:8px; color:#555; }
+/* Align active and inactive navigation buttons without an outer halo. */
+#td-profile-layout-bar > button,
+#trophydeck-sticky .td-profile-layout-bar > button { box-shadow:none !important; }
+#td-profile-layout-bar > button:focus-visible,
+#trophydeck-sticky .td-profile-layout-bar > button:focus-visible { outline:2px solid white; outline-offset:-3px; }
+/* The original boxes already include their own spacing. */
+#content > .td-unified-grid { grid-auto-rows:1px; }
+#content > .td-unified-grid > .td-profile-section { padding-bottom:0; }
+/* Breathing room inside every deck section, including quick settings. */
+#trophydeck-rail .td-card-body { min-width:0; padding:2px 6px 4px; }
+#trophydeck-rail .epic-toggle > span { min-width:0; }
+#trophydeck-rail .td-quick-group { border:1px solid color-mix(in srgb,var(--td-accent) 65%,transparent); border-radius:4px; margin:6px 0; }
+#trophydeck-rail .epic-settings .td-quick-group > summary { display:list-item; padding:7px 9px; cursor:pointer; }
+#trophydeck-rail .td-quick-group-controls { padding:0 9px 5px; }
 `;
     document.head.append(style);
     applyTheme();
