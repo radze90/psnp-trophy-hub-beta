@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.28
+// @version      1.0.30
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.28";
+const APP_VERSION = "1.0.30";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -574,6 +574,7 @@ function openSettings() {
             const rail = document.getElementById('trophydeck-rail');
             if (rail) {
                 rail.style.setProperty('--epic-width', width.value + 'px');
+                updateRailOverlap(rail);
             }
         });
     widthLabel.append(widthValue, width);
@@ -1930,6 +1931,33 @@ function setupScrollControls() {
     }
 }
 
+function railRectanglesIntersect(a, b) {
+    return !!(a && b && a.width > 0 && a.height > 0 && b.width > 0 && b.height > 0 &&
+        a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top);
+}
+
+function updateRailOverlap(rail = document.getElementById('trophydeck-rail')) {
+    if (!rail || !rail.classList.contains('epic-left')) {
+        if (rail) rail.classList.remove('td-rail-overlap');
+        return;
+    }
+    const tab = rail.querySelector('.epic-tab');
+    if (!tab) return;
+    const tabRect = tab.getBoundingClientRect();
+    const railRect = rail.getBoundingClientRect();
+    const profile = profileInfo();
+    const nav = profile?.nav.closest('.title-bar');
+    const sticky = document.getElementById('trophydeck-sticky');
+    const headers = [nav, sticky && !sticky.hidden ? sticky : null].filter(Boolean);
+    const headerOverlap = headers.some(element => railRectanglesIntersect(tabRect, element.getBoundingClientRect()));
+    const menuOverlap = Array.from(document.querySelectorAll('.psnpp-floating-menu')).some(element => {
+        const style = getComputedStyle(element);
+        if (element.hidden || style.display === 'none' || style.visibility === 'hidden') return false;
+        return railRectanglesIntersect(railRect, element.getBoundingClientRect());
+    });
+    rail.classList.toggle('td-rail-overlap', headerOverlap || menuOverlap);
+}
+
 function applyRailPosition() {
     const rail=document.getElementById('trophydeck-rail');
     if(!rail){
@@ -1956,10 +1984,12 @@ function applyRailPosition() {
     }
     if(localStorage.getItem('trophydeck.positionMode')!=='fixed' && localStorage.getItem('trophydeck.positionDocked')!=='false' && navRect){
         rail.style.top=Math.max(0,navRect.top)+'px';
+        updateRailOverlap(rail);
         return;
     }
     const anchor=Number(localStorage.getItem('trophydeck.positionAnchorScroll')||0);
     rail.style.top=Math.max(0,localStorage.getItem('trophydeck.positionMode')==='fixed'?base:base-Math.max(0,window.scrollY-anchor))+'px';
+    updateRailOverlap(rail);
 }
 
 function enableRailDragging(header) {
@@ -1978,6 +2008,7 @@ function enableRailDragging(header) {
                 }const pos=Math.max(0,Math.min(window.innerHeight*.9,top+e.clientY-start));
                 localStorage.setItem('trophydeck.positionPercent',String(Math.round(pos/window.innerHeight*100)));
                 rail.style.top=pos+'px';
+                updateRailOverlap(rail);
             };
             const stop=()=>{
                 header.removeEventListener('pointermove',move);
@@ -2541,6 +2572,7 @@ function renderRail() {
         tab.setAttribute('aria-label', railOpen ? t("Collapse Trophy Deck") : t("Expand Trophy Deck"));
         tab.setAttribute('aria-expanded', String(railOpen));
         root.classList.toggle('epic-closed', !railOpen);
+        requestAnimationFrame(() => { if (root.isConnected) updateRailOverlap(root); });
     }
     tab.addEventListener('click', () => {
             logEvent('deck.toggle');
@@ -2549,6 +2581,7 @@ function renderRail() {
             updateTab();
         });
     updateTab();
+    root.addEventListener('transitionend', event => { if (event.propertyName === 'transform') updateRailOverlap(root); });
     root.append(tab);
     const panel = make('div', null, 'epic-panel');
     const header = make('header', null, 'epic-header');
@@ -3259,6 +3292,24 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 #trophydeck-rail .epic-panel-scroll::-webkit-scrollbar { width:10px; }
 #trophydeck-rail .epic-panel-scroll::-webkit-scrollbar-track { background:var(--td-base); }
 #trophydeck-rail .epic-panel-scroll::-webkit-scrollbar-thumb { background:var(--td-accent); border:2px solid var(--td-base); border-radius:8px; }
+/* Fade a left-side deck only while it actually covers profile navigation or a PSNP+ menu. */
+#trophydeck-rail { transition:transform .28s ease, opacity .2s ease; }
+#trophydeck-rail.epic-left.td-rail-overlap:not(:hover):not(:focus-within) { opacity:.14; }
+@media (prefers-reduced-motion:reduce) { #trophydeck-rail { transition:none; } }
+/* Only the inner content area owns a scrollbar, never the dialog frame. */
+#trophydeck-settings.td-scroll-dialog,
+#trophydeck-guide.td-scroll-dialog,
+.td-dialog.td-scroll-dialog { scrollbar-width:none; }
+#trophydeck-settings.td-scroll-dialog::-webkit-scrollbar,
+#trophydeck-guide.td-scroll-dialog::-webkit-scrollbar,
+.td-dialog.td-scroll-dialog::-webkit-scrollbar { display:none; }
+.td-scroll-dialog > .td-dialog-scroll { scrollbar-width:auto; }
+/* Cover the header edge so a scroll gutter cannot show through at the corner. */
+.td-scroll-dialog > h2::after {
+    content:''; position:absolute; top:0; bottom:0; right:-1px; width:11px;
+    background:var(--td-accent); border-radius:0 4px 0 0; pointer-events:none;
+}
+.td-scroll-dialog > h2 > .td-dialog-close { z-index:1; }
 `;
     document.head.append(style);
     applyTheme();
@@ -3273,7 +3324,7 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
     const layoutObserver = new MutationObserver(records => {
         if (layoutPending || !records.some(record => record.addedNodes.length)) return;
         layoutPending = true;
-        requestAnimationFrame(() => { layoutPending = false; applyProfileLayout(); });
+        requestAnimationFrame(() => { layoutPending = false; applyProfileLayout(); updateRailOverlap(); });
     });
     layoutObserver.observe(document.body, {childList:true, subtree:true});
     setupScrollControls();
