@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.37
+// @version      1.0.38
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.37";
+const APP_VERSION = "1.0.38";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -63,7 +63,7 @@ const features = [
     { key: 'trophydeck.gameNotes', label: t("Show notes below games"), defaultValue: true },
     { key: 'trophydeck.stickyNav', label: t("Keep profile navigation visible when scrolling"), defaultValue: true },
     { key: 'trophydeck.customLinks', label: t("Custom links in the deck"), defaultValue: true },
-    { key: 'trophydeck.noteWrap', label: t("Wrap game notes"), defaultValue: false },
+    { key: 'trophydeck.noteWrap', label: t("Wrap game notes"), defaultValue: true },
     { key: 'trophydeck.psnpColors', label: t("Apply theme to PSNProfiles"), defaultValue: false },
     { key: 'trophydeck.analytics', label: t("Count anonymous usage locally"), defaultValue: true }
 ];
@@ -194,7 +194,7 @@ function toggleControl(feature) {
     input.dataset.epicToggle = feature.key;
     const copy=make('span');
     copy.append(make('span',feature.label));
-    const descriptions={showAccountLinks:t('Links to your own profile and account pages.'),hideFlaggedBox:t("Hides the leaderboard notice on profile pages."),showRail:t("Shows Trophy Deck as a collapsible sidebar."),showStats:t("Calculates additional profile statistics."),showLinks:t("Provides preset views of the game list."),showNote:t("A note for the profile currently displayed."),globalNote:t("The same note on every page."),favorites:t("Saves profile links as favorites."),cabinet:t("Use the star in the profile game list to save games to the cabinet."),cabinetNames:t("Shows shortened game names below covers."),scrollButtons:t("Adds a scroll-to-bottom button next to the scroll-to-top button."),customLinks:t("Manage your own links and categories."),gameNotes:t("Shows personal game notes on profile and game pages."),noteWrap:t("Displays long game notes over multiple lines."),stickyNav:t("Keeps the profile navigation with Profile, Trophy Log and Stats visible while scrolling."),psnpColors:t("Applies the selected theme to page headers and dialogs."),analytics:t("Counts selected actions locally; nothing is sent automatically.")};
+    const descriptions={showAccountLinks:t('Links to your own profile and account pages.'),hideFlaggedBox:t("Hides the leaderboard notice on profile pages."),showRail:t("Shows Trophy Deck as a collapsible sidebar."),showStats:t("Calculates additional profile statistics."),showLinks:t("Provides preset views of the game list."),showNote:t("A note for the profile currently displayed."),globalNote:t("The same note on every page."),favorites:t("Saves profile links as favorites."),cabinet:t("Use the star in the profile game list to save games to the cabinet."),cabinetNames:t("Shows shortened game names below covers."),scrollButtons:t("Adds a scroll-to-bottom button next to the scroll-to-top button."),customLinks:t("Manage your own links and categories."),gameNotes:t("Shows the same game note across profiles on this browser."),noteWrap:t("Displays long game notes over multiple lines."),stickyNav:t("Keeps the profile navigation with Profile, Trophy Log and Stats visible while scrolling."),psnpColors:t("Applies the selected theme to page headers and dialogs."),analytics:t("Counts selected actions locally; nothing is sent automatically.")};
     const desc=descriptions[feature.key.replace('trophydeck.','')];
     if(desc){
         copy.append(make('small',desc,'td-setting-description'));
@@ -754,7 +754,7 @@ function openFeatureGuide() {
             ]],
         [t("On profile and game pages"), [
                 [t("Profile layout"), t("Use the edit icon beside the profile name. Drag sections around the three-column grid and use the width button to change their size. The reset icon appears while editing.")],
-                [t("Game notes"), t("Click the note below a game or on its trophy page. Text is saved locally as you type; clicking outside closes the editor. Web links are clickable.")],
+                [t("Game notes"), t("Click the note below a game or on its trophy page. The same note appears for this game on every profile in this browser. Text is saved locally as you type. Clicking outside closes the editor. Web links are clickable.")],
                 [t("Game cabinet"), t("Use the star beside a game to save it to the displayed profile’s cabinet. Hover over its cover to reveal the remove button.")],
                 [t("Profile navigation"), t("Optionally keep the upper navigation with Profile, Trophy Log and Stats visible while scrolling.")]
             ]],
@@ -980,10 +980,16 @@ function updateStickyNav() {
         if (!sticky.hidden) {
             sticky.style.left = Math.max(0, rect.left) + 'px';
             sticky.style.width = Math.min(window.innerWidth, rect.width) + 'px';
+            const originals = Array.from(profile.nav.querySelectorAll('a[href]'));
+            const visibleRects = originals.map(link => link.getBoundingClientRect()).filter(box => box.width > 0 && box.height > 0);
+            if (visibleRects.length > 1) {
+                const gap = visibleRects[1].left - visibleRects[0].right;
+                if (gap >= 0 && gap <= 40) links.style.columnGap = gap + 'px';
+            }
             const signature = profile.nav.innerHTML;
             if (links.dataset.signature !== signature) {
                 links.replaceChildren();
-                profile.nav.querySelectorAll('a[href]').forEach(original => {
+                originals.forEach(original => {
                         const link = make('a', original.textContent.trim());
                         link.href = original.href;
                         copyTypography(original, link);
@@ -1205,8 +1211,45 @@ function railWidth() {
     return Math.max(260, Math.min(maxRailWidth(), Number.isFinite(value) && value > 0 ? value : recommendedRailWidth()));
 }
 
+const GLOBAL_GAME_NOTE_PREFIX = 'trophydeck.gameNote.global.';
+const GLOBAL_GAME_INFO_PREFIX = 'trophydeck.gameInfo.global.';
+
+// Copy old profile-specific notes once. Conflicting texts remain available in
+// the notes manager so that no user-written note is overwritten or discarded.
+function migrateGameNotes() {
+    const grouped = new Map();
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const match = key && key.match(/^trophydeck\.gameNote\.\/([^/]+)\.(\d+)$/);
+        if (!match || !localStorage.getItem(key)) continue;
+        if (!grouped.has(match[2])) grouped.set(match[2], []);
+        grouped.get(match[2]).push({key, user:match[1].toLowerCase(), value:localStorage.getItem(key)});
+    }
+    let ownUser = '';
+    try {
+        const own = Array.from(document.querySelectorAll('div.user-menu ul.dropdown-menu a')).find(link => link.textContent.trim() === 'Your Profile');
+        if (own) ownUser = decodeURIComponent(new URL(own.href, location.href).pathname.replace(/^\/|\/$/g, '')).toLowerCase();
+    } catch (_) {}
+    for (const [id, candidates] of grouped) {
+        const marker = 'trophydeck.gameNoteMigration.' + id;
+        if (localStorage.getItem(marker) === '1') continue;
+        candidates.sort((a, b) => (b.user === ownUser) - (a.user === ownUser) || a.key.localeCompare(b.key));
+        const globalKey = GLOBAL_GAME_NOTE_PREFIX + id;
+        if (localStorage.getItem(globalKey) === null) localStorage.setItem(globalKey, candidates[0].value);
+        const chosen = localStorage.getItem(globalKey);
+        const matching = candidates.find(candidate => candidate.value === chosen);
+        if (matching && localStorage.getItem(GLOBAL_GAME_INFO_PREFIX + id) === null) {
+            const info = localStorage.getItem(matching.key.replace('trophydeck.gameNote.', 'trophydeck.gameInfo.'));
+            if (info !== null) localStorage.setItem(GLOBAL_GAME_INFO_PREFIX + id, info);
+        }
+        for (const candidate of candidates) if (candidate.value === chosen) localStorage.removeItem(candidate.key);
+        localStorage.setItem(marker, '1');
+    }
+}
+
 function noteWidget(key, label, placeholder) {
-    const wrap=make('div',null,'trophydeck-game-note');
+    const isGameNote = key.startsWith('trophydeck.gameNote.');
+    const wrap=make('div',null,'trophydeck-game-note' + (isGameNote ? '' : ' td-note-unlimited'));
     const preview=make('div',null,'td-note-preview');
     preview.tabIndex=0;
     const editor=make('textarea',null,'td-note-editor');
@@ -1300,8 +1343,8 @@ function updateGameNotes(refresh = false) {
                 if(!cell||cell.querySelector('[data-game-note]')){
                     return;
                 }
-                localStorage.setItem('trophydeck.gameInfo.'+profile.path.toLowerCase()+'.'+m[1],JSON.stringify({name:link.textContent.trim(),href:url.pathname}));
-                const wrap=noteWidget('trophydeck.gameNote.'+profile.path.toLowerCase()+'.'+m[1],t("Note for ")+link.textContent.trim(),t("+ Game note"));
+                localStorage.setItem(GLOBAL_GAME_INFO_PREFIX+m[1],JSON.stringify({name:link.textContent.trim(),href:url.pathname}));
+                const wrap=noteWidget(GLOBAL_GAME_NOTE_PREFIX+m[1],t("Note for ")+link.textContent.trim(),t("+ Game note"));
                 wrap.dataset.gameNote='true';
                 const infos=cell.querySelectorAll('.small-info');
                 if(infos.length){
@@ -1315,26 +1358,19 @@ function updateGameNotes(refresh = false) {
     if(!match){
         return;
     }
-    let user=match[2];
-    if(!user) {
-        const own=Array.from(document.querySelectorAll('div.user-menu ul.dropdown-menu a')).find(a=>a.textContent.trim()==='Your Profile');
-        if(own){
-            user=new URL(own.href,location.href).pathname.split('/').filter(Boolean)[0];
-        }
-    }
     const title=Array.from(document.querySelectorAll('#content .title h3')).find(h=>/trophies$/i.test(h.textContent.trim()));
-    if(!user||!title){
+    if(!title){
         return;
     }
     const bar=title.closest('.title');
     if(!bar||bar.parentElement.querySelector('[data-game-page-note]')){
         return;
     }
-    localStorage.setItem('trophydeck.gameInfo./'+user.toLowerCase()+'.'+match[1],JSON.stringify({name:title.textContent.trim().replace(/\s+Trophies$/i,''),href:'/trophies/'+location.pathname.split('/')[2]+'/'+user}));
+    localStorage.setItem(GLOBAL_GAME_INFO_PREFIX+match[1],JSON.stringify({name:title.textContent.trim().replace(/\s+Trophies$/i,''),href:location.pathname}));
     const section=make('div',null,'td-game-page-note');
     section.dataset.gamePageNote='true';
-    section.append(make('strong',t("Game note · ")+decodeURIComponent(user)));
-    const note=noteWidget('trophydeck.gameNote./'+user.toLowerCase()+'.'+match[1],t("Game note for ")+decodeURIComponent(user),t("+ Game note"));
+    section.append(make('strong',t('Game note')));
+    const note=noteWidget(GLOBAL_GAME_NOTE_PREFIX+match[1],t('Game note'),t("+ Game note"));
     note.dataset.gameNote='true';
     section.append(note);
     bar.after(section);
@@ -1739,7 +1775,7 @@ function openNotesManager() {
         const keys=[];
         for(let i=0;i<localStorage.length;i++){
             const k=localStorage.key(i);
-            if(k==='trophydeck.globalNoteText'||k.startsWith('trophydeck.note./')||k.startsWith('trophydeck.gameNote./')) {
+            if(k==='trophydeck.globalNoteText'||k.startsWith('trophydeck.note./')||k.startsWith('trophydeck.gameNote./')||k.startsWith(GLOBAL_GAME_NOTE_PREFIX)) {
                 if(localStorage.getItem(k)) {
                     keys.push(k);
                 }
@@ -1755,16 +1791,19 @@ function openNotesManager() {
                 if(key==='trophydeck.globalNoteText') {
                     label=t("Global note");
                 }
+                else if(key.startsWith(GLOBAL_GAME_NOTE_PREFIX)) {
+                    label=t('Game note')+t(' · Game ID ')+key.slice(GLOBAL_GAME_NOTE_PREFIX.length);
+                }
                 else if(key.startsWith('trophydeck.gameNote./')) {
                     const part=key.slice('trophydeck.gameNote./'.length), split=part.lastIndexOf('.');
-                    label=t("Game note · ")+part.slice(0,split)+t(" · Game ID ")+part.slice(split+1);
+                    label=t('Previous game note · ')+part.slice(0,split)+t(' · Game ID ')+part.slice(split+1);
                 }
                 
                 else {
                     label=t("Profile note · ")+key.slice('trophydeck.note./'.length);
                 }
                 item.append(make('strong',label));
-                if(key.startsWith('trophydeck.gameNote./')) {
+                if(key.startsWith('trophydeck.gameNote./') || key.startsWith(GLOBAL_GAME_NOTE_PREFIX)) {
                     let info=null;
                     try{
                         info=JSON.parse(localStorage.getItem(key.replace('trophydeck.gameNote.','trophydeck.gameInfo.'))||'null');
@@ -1807,7 +1846,7 @@ function openNotesManager() {
             const keys=[];
             for(let i=0;i<localStorage.length;i++){
                 const key=localStorage.key(i);
-                if(key==='trophydeck.globalNoteText'||key.startsWith('trophydeck.note./')||key.startsWith('trophydeck.gameNote./')){
+                if(key==='trophydeck.globalNoteText'||key.startsWith('trophydeck.note./')||key.startsWith('trophydeck.gameNote./')||key.startsWith(GLOBAL_GAME_NOTE_PREFIX)){
                     keys.push(key);
                 }
             }
@@ -3396,9 +3435,15 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 #trophydeck-theme-picker .td-custom-colors label { display:flex; align-items:center; gap:6px; margin:0; }
 #trophydeck-theme-picker .td-custom-colors input[type="color"] { width:34px; height:28px; padding:0; margin:0; border:0; cursor:pointer; background:transparent; }
 .td-cabinet-empty { margin-bottom:10px; }
+/* Profile and global notes grow with their content. Game notes keep their own line limit. */
+.trophydeck-game-note.td-note-unlimited .td-note-preview { display:block; -webkit-line-clamp:unset; overflow:visible; }
+/* Keep navigation links grouped at the right, directly beside the edit control. */
+#trophydeck-sticky { justify-content:initial; }
+#trophydeck-sticky nav { margin-left:auto; }
 `;
     document.head.append(style);
     applyTheme();
+    migrateGameNotes();
     updateFlagged();
     renderRail();
     updateGameNotes();

@@ -321,5 +321,9 @@ var __trophyDeckLocale_en = {
   "Already in favorites": "Already in favorites",
   "+ Current player": "+ Current player",
   "This player is already in your favorites.": "This player is already in your favorites.",
-  "Add the currently viewed player.": "Add the currently viewed player."
+  "Add the currently viewed player.": "Add the currently viewed player.",
+  "Game note": "Game note",
+  "Previous game note · ": "Previous game note · ",
+  "Shows the same game note across profiles on this browser.": "Shows the same game note across profiles on this browser.",
+  "Click the note below a game or on its trophy page. The same note appears for this game on every profile in this browser. Text is saved locally as you type. Clicking outside closes the editor. Web links are clickable.": "Click the note below a game or on its trophy page. The same note appears for this game on every profile in this browser. Text is saved locally as you type. Clicking outside closes the editor. Web links are clickable."
 };

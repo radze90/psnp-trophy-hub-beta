@@ -321,5 +321,9 @@ var __trophyDeckLocale_de = {
   "Already in favorites": "Bereits favorisiert",
   "+ Current player": "+ Aktueller Spieler",
   "This player is already in your favorites.": "Dieser Spieler ist bereits in deinen Favoriten.",
-  "Add the currently viewed player.": "Aktuell geöffneten Spieler hinzufügen."
+  "Add the currently viewed player.": "Aktuell geöffneten Spieler hinzufügen.",
+  "Game note": "Spielnotiz",
+  "Previous game note · ": "Bisherige Spielnotiz · ",
+  "Shows the same game note across profiles on this browser.": "Zeigt für dasselbe Spiel auf allen Profilen in diesem Browser dieselbe Notiz an.",
+  "Click the note below a game or on its trophy page. The same note appears for this game on every profile in this browser. Text is saved locally as you type. Clicking outside closes the editor. Web links are clickable.": "Klicke auf die Notiz unter einem Spiel oder auf dessen Trophäenseite. Für dasselbe Spiel erscheint in diesem Browser auf jedem Profil dieselbe Notiz. Der Text wird während der Eingabe lokal gespeichert. Ein Klick außerhalb schließt den Editor. Weblinks sind anklickbar."
 };
