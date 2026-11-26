@@ -1,16 +1,16 @@
 // ==UserScript==
-// @name         Trophy Deck
+// @name         Trophy Deck Beta
 // @namespace    trophydeck.local
-// @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.34
+// @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck-beta/main/Trophy-Deck-Beta.user.js
+// @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck-beta/main/Trophy-Deck-Beta.user.js
+// @version      1.0.36
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
 // @noframes
 // @grant        none
-// @require      https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/locales/de.js
-// @require      https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/locales/en.js
+// @require      https://raw.githubusercontent.com/radze90/psn-trophy-deck-beta/main/locales/de.js
+// @require      https://raw.githubusercontent.com/radze90/psn-trophy-deck-beta/main/locales/en.js
 // ==/UserScript==
 
 (function () {
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.34";
+const APP_VERSION = "1.0.36";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -1916,7 +1916,7 @@ function updateGameCabinet() {
         const grow=make('div',null,'grow');
         grow.append(make('h3',t("Game cabinet")));
         heading.append(grow);
-        const grid=make('div',null,'box td-cabinet-grid');
+        const grid=make('div',null,list.length ? 'box td-cabinet-grid' : 'box td-cabinet-empty');
         if (!list.length) grid.append(make('p', t(cabinetEnabled ? 'No games in the cabinet yet.' : 'Enable the game cabinet in settings.'), 'td-cabinet-placeholder'));
         list.forEach(game=>{
                 const tile=make('div',null,'td-cabinet-tile');
@@ -3395,6 +3395,7 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 #trophydeck-theme-picker .td-custom-colors { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:16px; }
 #trophydeck-theme-picker .td-custom-colors label { display:flex; align-items:center; gap:6px; margin:0; }
 #trophydeck-theme-picker .td-custom-colors input[type="color"] { width:34px; height:28px; padding:0; margin:0; border:0; cursor:pointer; background:transparent; }
+.td-cabinet-empty { margin-bottom:10px; }
 `;
     document.head.append(style);
     applyTheme();
