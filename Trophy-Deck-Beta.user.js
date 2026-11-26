@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psn-trophy-deck/main/Trophy-Deck-Beta.user.js
-// @version      1.0.27
+// @version      1.0.28
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,12 +19,11 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.27";
+const APP_VERSION = "1.0.28";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
     if (Object.prototype.hasOwnProperty.call(translations, saved)) return saved;
-    if (saved !== 'auto') return 'en';
     const browserLanguages = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
     for (const value of browserLanguages) {
         const language = String(value || '').toLowerCase().split('-')[0];
@@ -90,6 +89,16 @@ const themes = {
     'Bernstein':['#392c1b','#503d27','#8c6332'], 'Schiefer':['#292f37','#39414a','#607488'],
     'Graphit':['#25292e','#383d44','#626b76']
 };
+
+const defaultCustomTheme = ['#192b40', '#223b55', '#315c89'];
+function readCustomTheme() {
+    try {
+        const colors = JSON.parse(localStorage.getItem('trophydeck.customTheme') || 'null');
+        if (Array.isArray(colors) && colors.length === 3 && colors.every(color => /^#[0-9a-f]{6}$/i.test(color))) return colors;
+    } catch (_) {}
+    return [...defaultCustomTheme];
+}
+themes.Custom = readCustomTheme();
 
 function applyTheme() {
     const name = localStorage.getItem('trophydeck.theme') || 'Blau';
@@ -204,6 +213,12 @@ function prepareDialog(dialog) {
         heading.append(close);
     }else {
         dialog.prepend(close);
+    }
+    if (heading) {
+        const scrollBody = make('div', null, 'td-dialog-scroll');
+        Array.from(dialog.children).forEach(child => { if (child !== heading) scrollBody.append(child); });
+        dialog.append(scrollBody);
+        dialog.classList.add('td-scroll-dialog');
     }
     dialog.addEventListener('click',event=>{
             if(event.target!==dialog){
@@ -325,6 +340,7 @@ async function importBackup(file) {
 
 
 const themeLabels = {
+    "Custom": "Custom",
     "Blau": "Blue",
     "Ozean": "Ocean",
     "Mitternacht": "Midnight",
@@ -364,6 +380,7 @@ function openSettings() {
         ['colors', "Colors", ['psnpColors']],
         ['analytics', "Usage statistics", ['analytics']],
         ['backup', 'Backup', []],
+        ['maintenance', 'Maintenance', []],
     ];
     const sections = {};
     categories.forEach(([id, name, keys]) => {
@@ -393,7 +410,8 @@ function openSettings() {
             option.value = code;
             languageSelect.append(option);
         });
-    languageSelect.value = localStorage.getItem('trophydeck.language') || 'en';
+    const savedLanguage = localStorage.getItem('trophydeck.language');
+    languageSelect.value = languageOptions.some(([code]) => code === savedLanguage) ? savedLanguage : 'auto';
     languageSelect.addEventListener('change', () => {
             localStorage.setItem('trophydeck.language', languageSelect.value);
             logEvent('setting.language');
@@ -454,6 +472,23 @@ function openSettings() {
     }drawSwatches();
     theme.addEventListener('change',drawSwatches);
     sections.colors.append(swatches);
+    const customColors = make('div', null, 'td-custom-colors');
+    customColors.append(make('strong', t('Custom colors')));
+    [['Background', 0], ['Cards', 1], ['Accent', 2]].forEach(([label, index]) => {
+        const field = make('label', t(label));
+        const input = make('input'); input.type = 'color'; input.value = themes.Custom[index];
+        input.setAttribute('aria-label', t(label));
+        input.addEventListener('input', () => {
+            const colors = readCustomTheme(); colors[index] = input.value;
+            localStorage.setItem('trophydeck.customTheme', JSON.stringify(colors));
+            themes.Custom = colors; theme.value = 'Custom';
+            localStorage.setItem('trophydeck.theme', 'Custom');
+            applyTheme(); drawSwatches();
+        });
+        input.addEventListener('change', () => logEvent('theme.custom'));
+        field.append(input); customColors.append(field);
+    });
+    sections.colors.append(customColors);
     const reset = make('button', t("Reset section order"), 'epic-button');
     reset.type='button';
     reset.addEventListener('click', () => {
@@ -487,7 +522,7 @@ function openSettings() {
     const exportAll=make('button',t("Download backup"),'epic-button');
     exportAll.type='button';
     exportAll.addEventListener('click',exportData);
-    sections.backup.append(make('p',t("The backup contains your Trophy Deck settings, notes, links, favorites and locally stored data. Keep it safe. Importing replaces your current Trophy Deck data."),'epic-muted'),exportAll);
+    sections.backup.append(make('p',t("The backup contains your Trophy Deck settings, notes, links, favorites and locally stored data. Keep it safe. Importing replaces your current Trophy Deck data."),'epic-muted'));
     const wipe=make('button',t("Reset Trophy Deck completely"),'epic-button td-danger');
     wipe.type='button';
     wipe.addEventListener('click',async()=>{
@@ -505,7 +540,7 @@ function openSettings() {
             keys.forEach(key=>localStorage.removeItem(key));
             location.reload();
         });
-    sections.backup.append(make('p',t("A full reset permanently deletes all local Trophy Deck data. Download a backup first if needed."),'epic-muted'),wipe);
+    sections.maintenance.append(make('p',t("A full reset permanently deletes all local Trophy Deck data. Download a backup first if needed."),'epic-muted'),wipe);
     const fileInput=make('input');
     fileInput.type='file';
     fileInput.accept='.json,application/json';
@@ -518,7 +553,9 @@ function openSettings() {
             fileInput.value='';
             importBackup(file);
         });
-    sections.backup.append(importButton,fileInput);
+    const backupActions=make('div',null,'td-setting-actions');
+    backupActions.append(importButton,exportAll,fileInput);
+    sections.backup.append(backupActions);
 
 
     sections.analytics.append(make('p', t("Optional local counters, switches and appearance settings including the color theme. No note content, URLs or profile names. Export is manual; nothing is sent automatically."), 'epic-muted'));
@@ -970,153 +1007,122 @@ function addGlobalNote(panel) {
 }
 
 function addCustomLinks(panel) {
-    const box=make('section',null,'epic-card');
-    box.append(make('h3',t("My links")));
-    const content=make('div',null,'td-links-content');
+    const box = make('section', null, 'epic-card');
+    box.append(make('h3', t('My links')));
+    const content = make('div', null, 'td-links-content');
     function read() {
         try {
-            const data=JSON.parse(localStorage.getItem('trophydeck.customLinkData') || '{}');
-            return { categories:Array.isArray(data.categories)?data.categories:[], links:Array.isArray(data.links)?data.links:[] };
-        }
-        catch (_) {
-            return {categories:[],links:[]};
-        }
+            const data = JSON.parse(localStorage.getItem('trophydeck.customLinkData') || '{}');
+            return {categories:Array.isArray(data.categories) ? data.categories : [], links:Array.isArray(data.links) ? data.links : []};
+        } catch (_) { return {categories:[], links:[]}; }
     }
     function save(data) {
-        localStorage.setItem('trophydeck.customLinkData',JSON.stringify(data));
-        logEvent('customLinks.change');
-        draw();
+        localStorage.setItem('trophydeck.customLinkData', JSON.stringify(data));
+        logEvent('customLinks.change'); draw();
     }
-    function btn(text,title,callback) {
-        const b=make('button',t(text),'td-link-button'+(title.includes('Add')?'':' td-edit-control'));
-        b.type='button';
-        b.title=t(title);
-        b.setAttribute('aria-label',t(title));
-        b.addEventListener('click',event=>{
-                event.stopPropagation();
-                callback();
-            });
-        return b;
+    function btn(text, title, callback, editable = false) {
+        const button = make('button', t(text), 'td-link-button' + (editable ? ' td-edit-control' : ''));
+        button.type='button'; button.title=t(title); button.setAttribute('aria-label', button.title);
+        button.addEventListener('click', event => { event.stopPropagation(); callback(); });
+        return button;
     }
     async function askCategory(old) {
-        const value=await tdDialog(t("Category"),[{label:t("Name (up to 30 characters)"),value:old||'',max:30}]);
+        const value=await tdDialog(t('Category'), [{label:t('Name (up to 30 characters)'),value:old||'',max:30}]);
         return value && value[0] ? value[0] : null;
     }
-    async function askLink(current,category) {
-        const result=await tdDialog(t("Edit link"),[{label:t("Link text"),value:current?.text||'',max:80},{label:t("Address (HTTP or HTTPS)"),value:current?.url||'https://'}]);
-        if(!result || !result[0]){
-            return null;
-        }
+    async function askLink(current, category) {
+        const data = read();
+        const categoriesHidden = localStorage.getItem('trophydeck.hideLinkCategories') === 'true';
+        const fields = [{label:t('Link text'),value:current?.text||'',max:80},{label:t('Address (HTTP or HTTPS)'),value:current?.url||'https://'}];
+        if (data.categories.length && !categoriesHidden) fields.push({label:t('Category'), value:current?.category ?? category ?? '', required:false, options:[{value:'',label:t('Uncategorized')},...data.categories.map(name=>({value:name,label:name}))]});
+        const result=await tdDialog(t(current ? 'Edit link' : 'Add link'), fields);
+        if (!result || !result[0]) return null;
         try {
             const url=new URL(result[1]);
-            if(!['http:','https:'].includes(url.protocol)||url.username||url.password){
-                throw new Error();
-            } return {text:result[0],url:url.href,category};
-        }
-        catch (_) {
-            await tdDialog(t("Invalid address"),[],t("Enter an HTTP or HTTPS address without credentials."));
-            return null;
-        }
+            if (!['http:','https:'].includes(url.protocol) || url.username || url.password) throw new Error();
+            const selected = fields.length > 2 ? result[2] : (current?.category ?? category ?? '');
+            return {text:result[0],url:url.href,category:selected};
+        } catch (_) { await tdDialog(t('Invalid address'),[],t('Enter an HTTP or HTTPS address without credentials.')); return null; }
     }
     function draw() {
         content.replaceChildren();
-        const data=read();
-        const categories=[...(data.links.some(link=>!link.category)?['']:[]),...data.categories];
-        categories.forEach(category=>{
-                const section=make('div',null,'td-custom-group');
-                const title=make('div',null,'td-custom-heading');
-                title.append(make('strong',category || t("Uncategorized")));
-                if(category) {
-                    title.append(btn('✎',"Rename category",async()=>{
-                                const n=await askCategory(category);
-                                if(!n || data.categories.includes(n)) {
-                                    return;
-                                } data.categories=data.categories.map(c=>c===category?n:c);
-                                data.links.forEach(l=>{
-                                        if(l.category===category) {
-                                            l.category=n;
-                                        }
-                                    });
-                                save(data);
-                            }),
-                        btn('×',"Delete category",async()=>{
-                                if(!await tdDialog(t("Delete category"),[],t("The links will remain uncategorized."))) {
-                                    return;
-                                } data.categories=data.categories.filter(c=>c!==category);
-                                data.links.forEach(l=>{
-                                        if(l.category===category) {
-                                            l.category='';
-                                        }
-                                    });
-                                save(data);
-                            }));
+        const data = read();
+        const categoriesHidden = localStorage.getItem('trophydeck.hideLinkCategories') === 'true';
+        const flat = categoriesHidden || data.categories.length === 0;
+        const groups = flat ? [null] : [...(data.links.some(link=>!link.category)?['']:[]), ...data.categories];
+        let dragging = null;
+        function moveLink(targetIndex, targetCategory) {
+            if (dragging === null) return;
+            const from = dragging; dragging = null;
+            const [moved] = data.links.splice(from,1);
+            if (!moved) return;
+            if (targetCategory !== null) moved.category = targetCategory;
+            let to = targetIndex === null ? data.links.length : targetIndex;
+            if (targetIndex !== null && from < to) to--;
+            data.links.splice(Math.max(0,to),0,moved); save(data);
+        }
+        async function addLink(category) {
+            if (data.links.length >= 100) { await tdDialog(t('Maximum 100 links')); return; }
+            const item = await askLink(null, category);
+            if (item) { data.links.push(item); save(data); }
+        }
+        groups.forEach(category => {
+            const section = make('div',null,'td-custom-group');
+            if (category !== null) {
+                const title = make('div',null,'td-custom-heading');
+                title.append(make('strong',category || t('Uncategorized')));
+                if (category) {
+                    title.append(btn('✎','Rename category',async()=>{
+                        const name=await askCategory(category);
+                        if (!name || data.categories.includes(name)) return;
+                        data.categories=data.categories.map(value=>value===category?name:value);
+                        data.links.forEach(link=>{if(link.category===category)link.category=name;}); save(data);
+                    },true),btn('×','Delete category',async()=>{
+                        if (!await tdDialog(t('Delete category'),[],t('The links will remain uncategorized.'))) return;
+                        data.categories=data.categories.filter(value=>value!==category);
+                        data.links.forEach(link=>{if(link.category===category)link.category='';}); save(data);
+                    },true));
                 }
-                title.append(btn('+',"Add link",async()=>{
-                            if(data.links.length>=100) {
-                                await tdDialog(t("Maximum 100 links"));
-                                return;
-                            } const item=await askLink(null,category);
-                            if(item){
-                                data.links.push(item);
-                                save(data);
-                            }
-                        }));
+                title.append(btn('+','Add link',()=>addLink(category)));
                 section.append(title);
-                data.links.forEach((item,index)=>{
-                        if((item.category||'')!==category) {
-                            return;
-                        }
-                        const row=make('div',null,'td-custom-row');
-                        const a=make('a',item.text);
-                        a.href=item.url;
-                        a.target='_blank';
-                        a.rel='noopener noreferrer';
-                        a.addEventListener('click',()=>logEvent('customLinks.open'));
-                        row.append(a,btn('✎',"Edit link",async()=>{
-                                    const updated=await askLink(item,category);
-                                    if(updated){
-                                        data.links[index]=updated;
-                                        save(data);
-                                    }
-                                }),btn('×',"Delete link",async()=>{
-                                    if(await tdDialog(t("Delete link"),[],t("Delete this link?"))){
-                                        data.links.splice(index,1);
-                                        save(data);
-                                    }
-                                }));
-                        section.append(row);
-                    });
-                content.append(section);
+            }
+            data.links.forEach((item,index)=>{
+                if (category !== null && (item.category||'') !== category) return;
+                const row=make('div',null,'td-custom-row');
+                const drag=make('button','', 'td-link-button td-link-drag td-edit-control');
+                drag.type='button'; drag.draggable=true; drag.title=t('Drag to move this link'); drag.setAttribute('aria-label',drag.title);
+                setProfileLayoutIcon(drag,'drag');
+                drag.addEventListener('dragstart',event=>{dragging=index;event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',String(index));row.classList.add('td-link-dragging');});
+                drag.addEventListener('dragend',()=>{dragging=null;row.classList.remove('td-link-dragging');});
+                row.addEventListener('dragover',event=>{if(dragging!==null){event.preventDefault();row.classList.add('td-link-drop');}});
+                row.addEventListener('dragleave',()=>row.classList.remove('td-link-drop'));
+                row.addEventListener('drop',event=>{if(dragging===null)return;event.preventDefault();event.stopPropagation();row.classList.remove('td-link-drop');moveLink(index,category);});
+                const a=make('a',item.text);a.href=item.url;a.target='_blank';a.rel='noopener noreferrer';a.addEventListener('click',()=>logEvent('customLinks.open'));
+                row.append(drag,a,btn('✎','Edit link',async()=>{const updated=await askLink(item,category);if(updated){data.links[index]=updated;save(data);}},true),btn('×','Delete link',async()=>{if(await tdDialog(t('Delete link'),[],t('Delete this link?'))){data.links.splice(index,1);save(data);}},true));
+                section.append(row);
             });
-        content.append(btn("+ Link","Add uncategorized link",async()=>{
-                    if(data.links.length>=100){
-                        await tdDialog(t("Maximum 100 links"));
-                        return;
-                    }const item=await askLink(null,'');
-                    if(item){
-                        data.links.push(item);
-                        save(data);
-                    }
-                }));
-        content.append(btn("+ Category","Add category",async()=>{
-                    if(data.categories.length>=12){
-                        await tdDialog(t("Maximum 12 categories"));
-                        return;
-                    } const name=await askCategory('');
-                    if(name && !data.categories.includes(name)){
-                        data.categories.push(name);
-                        save(data);
-                    }
-                }));
+            section.addEventListener('dragover',event=>{if(dragging!==null)event.preventDefault();});
+            section.addEventListener('drop',event=>{if(dragging===null)return;event.preventDefault();moveLink(null,category);});
+            content.append(section);
+        });
+        const actions=make('div',null,'td-link-actions');
+        actions.append(btn('+ Link','Add link',()=>addLink('')));
+        if (!categoriesHidden) actions.append(btn('+ Category','Add category',async()=>{
+            if(data.categories.length>=12){await tdDialog(t('Maximum 12 categories'));return;}
+            const name=await askCategory('');if(name&&!data.categories.includes(name)){data.categories.push(name);save(data);}
+        }));
+        if (data.categories.length) actions.append(btn(categoriesHidden?'Show categories':'Hide categories',categoriesHidden?'Show categories':'Hide categories',()=>{
+            localStorage.setItem('trophydeck.hideLinkCategories',String(!categoriesHidden));draw();
+        }));
+        content.append(actions);
     }
-    draw();
-    box.append(content);
-    panel.append(box);
+    draw(); box.append(content); panel.append(box);
 }
 
 // Only links actually provided by the signed-in user's own menu are used.
 function readAccountShortcuts(menu) {
-    if (!menu || !menu.querySelector('a.dropdown-toggle[href]')) return [];
+    const identity = menu && menu.querySelector('a.dropdown-toggle[href]');
+    if (!identity) return [];
     const definitions = [
         ['your profile', 'My profile', 'accountUser'],
         ['game lists', 'Game lists', 'accountList'],
@@ -1130,8 +1136,16 @@ function readAccountShortcuts(menu) {
         const original = links.find(link => link.textContent.trim().toLowerCase() === text);
         if (!original) return [];
         try {
-            const url = new URL(original.href, location.href);
+            let url = new URL(original.href, location.href);
             if (url.origin !== location.origin || !/^https?:$/.test(url.protocol)) return [];
+            if (text === 'update profile') {
+                const account = new URL(identity.href, location.href);
+                if (account.origin !== location.origin || !/^\/[^/]+\/?$/.test(account.pathname)) return [];
+                const current = new URL(location.href);
+                url = new URL('/', location.origin);
+                url.searchParams.set('psnId', decodeURIComponent(account.pathname.replace(/^\/|\/$/g, '')));
+                url.searchParams.set('redirect', current.pathname + current.search + current.hash);
+            }
             return [{label, icon, href:url.href}];
         } catch (_) { return []; }
     });
@@ -1332,7 +1346,8 @@ function setupCardSorting(cards) {
     let dragged = null, originalOrder = null, dropped = false;
     elements.forEach(card => {
             const toolbar = make('div', null, 'epic-sort td-edit-control');
-            const handle = make('button', '⋮⋮', 'epic-drag');
+            const handle = make('button', '', 'epic-drag');
+            setProfileLayoutIcon(handle, 'drag');
             handle.type = 'button';
             handle.draggable = true;
             handle.title = t("Drag to move this section");
@@ -1465,10 +1480,10 @@ function tdDialog(title, fields = [], message = '') {
             const inputs=[];
             fields.forEach(field=>{
                     const label=make('label',field.label);
-                    const input=make('input');
-                    input.type=field.type||'text';
+                    const input=make(field.options ? 'select' : 'input');
+                    if (field.options) field.options.forEach(option => { const element=make('option', option.label); element.value=option.value; input.append(element); });
+                    else { input.type=field.type||'text'; input.maxLength=field.max||2048; }
                     input.value=field.value||'';
-                    input.maxLength=field.max||2048;
                     input.required=field.required!==false;
                     label.append(input);
                     form.append(label);
@@ -1520,6 +1535,9 @@ function addFavorites(panel) {
     function draw(){
         body.replaceChildren();
         const list=readList('trophydeck.favoritePlayers');
+        let favoriteColors = {};
+        try { favoriteColors = JSON.parse(localStorage.getItem('trophydeck.favoriteColors') || '{}') || {}; } catch (_) {}
+        function saveColors() { localStorage.setItem('trophydeck.favoriteColors', JSON.stringify(favoriteColors)); }
         const grid=make('div',null,'td-favorites-grid');
         let dragging=null;
         function persist(){
@@ -1529,6 +1547,13 @@ function addFavorites(panel) {
         }
         list.forEach((name,index)=>{
                 const tile=make('div',null,'td-favorite');
+                const savedColor = favoriteColors[name.toLowerCase()];
+                if (typeof savedColor === 'string' && /^#[0-9a-f]{6}$/i.test(savedColor)) {
+                    tile.style.setProperty('--td-favorite-color', savedColor);
+                    const value = parseInt(savedColor.slice(1), 16);
+                    const luminance = ((value >> 16) * 299 + ((value >> 8) & 255) * 587 + (value & 255) * 114) / 1000;
+                    tile.style.setProperty('--td-favorite-text', luminance > 155 ? '#17212b' : '#ffffff');
+                }
                 const viewed=profileInfo()?.path || '';
                 tile.classList.toggle('td-current-profile',viewed.toLowerCase()===('/'+name).toLowerCase());
                 tile.draggable=favoritesEditing;
@@ -1559,21 +1584,38 @@ function addFavorites(panel) {
                 rename.addEventListener('click',async()=>{
                         const result=await tdDialog(t("Edit favorite"),[{label:'PSN-ID',value:name,max:16}]);
                         if(result&&/^[a-zA-Z0-9_-]{1,16}$/.test(result[0])&&!list.some((other,i)=>i!==index&&other.toLowerCase()===result[0].toLowerCase())){
+                            if (favoriteColors[name.toLowerCase()]) {
+                                favoriteColors[result[0].toLowerCase()] = favoriteColors[name.toLowerCase()];
+                                if (result[0].toLowerCase() !== name.toLowerCase()) delete favoriteColors[name.toLowerCase()];
+                                saveColors();
+                            }
                             list[index]=result[0];
                             persist();
                         }
                     });
                 controls.append(rename);
+                const color = make('input'); color.type='color'; color.className='td-favorite-color';
+                color.value = /^#[0-9a-f]{6}$/i.test(savedColor || '') ? savedColor : '#315c89';
+                color.title=t('Player color'); color.setAttribute('aria-label',t('Player color') + ': ' + name);
+                color.addEventListener('input', () => { favoriteColors[name.toLowerCase()]=color.value; saveColors(); tile.style.setProperty('--td-favorite-color',color.value); });
+                color.addEventListener('change', () => { logEvent('favorites.color'); draw(); });
+                controls.append(color);
                 const del=make('button','×','td-link-button');
                 del.type='button';
                 del.setAttribute('aria-label',name+t(" remove"));
                 del.addEventListener('click',async()=>{
                         if(await tdDialog(t("Remove favorite"),[],name+t(" from favorites?"))){
                             list.splice(index,1);
+                            delete favoriteColors[name.toLowerCase()]; saveColors();
                             persist();
                         }
                     });
                 controls.append(del);
+                if (favoritesEditing) {
+                    const handle = make('span', null, 'td-favorite-drag');
+                    setProfileLayoutIcon(handle, 'drag'); handle.setAttribute('aria-hidden', 'true');
+                    tile.append(handle);
+                }
                 tile.append(a,controls);
                 tile.addEventListener('dragstart',e=>{
                         dragging=index;
@@ -2405,6 +2447,7 @@ function setProfileLayoutEditing(editing) {
 }
 
 const profileLayoutIcons = {
+    palette: 'M12 3a9 9 0 1 0 0 18h1.5a2 2 0 0 0 1.4-3.4 1.6 1.6 0 0 1 1.2-2.7h1A3.7 3.7 0 0 0 21 11c0-4.4-4-8-9-8z M7.5 10h.01 M10 7h.01 M14 7h.01 M17 10h.01',
     accountUser:'M20 21v-2a7 7 0 0 0-14 0v2 M13 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
     accountList:'M8 6h12 M8 12h12 M8 18h12 M4 6h.01 M4 12h.01 M4 18h.01',
     accountLog:'M5 4h14v16H5z M8 8h8 M8 12h8 M8 16h5',
@@ -2473,7 +2516,7 @@ const openQuickSettingGroups = new Set();
 
 function renderRail() {
     const old = document.getElementById('trophydeck-rail');
-    const previousScroll=old?.querySelector('.epic-panel')?.scrollTop || 0;
+    const previousScroll=(old?.querySelector('.epic-panel-scroll') || old?.querySelector('.epic-panel'))?.scrollTop || 0;
     if (old) {
         old.remove();
     }
@@ -2575,6 +2618,8 @@ function renderRail() {
     actions.append(guide, palette, gear);
     header.append(actions);
     panel.append(header);
+    const panelScroll = make('div', null, 'epic-panel-scroll');
+    panel.append(panelScroll);
     const profile = profileInfo();
     const cards = make('div', null, 'epic-cards');
     function addCard(key, add) {
@@ -2606,7 +2651,7 @@ function renderRail() {
         addCard('favorites', addFavorites);
     }
     if (!profile) {
-        panel.append(make('p', t("Open a profile for progress, quick filters and profile notes."), 'epic-muted'));
+        panelScroll.append(make('p', t("Open a profile for progress, quick filters and profile notes."), 'epic-muted'));
     }
     const settings = make('section', null, 'epic-card epic-settings');
     settings.append(make('h3', t("Quick settings")));
@@ -2617,7 +2662,12 @@ function renderRail() {
         const controls = make('div', null, 'td-quick-group-controls');
         features.filter(feature => keys.includes(feature.key.replace('trophydeck.', '')))
             .forEach(feature => controls.append(toggleControl(feature)));
-        if (id === 'appearance') controls.append(make('small', t('Choose colors with the palette icon above or in All settings.'), 'td-quick-color-hint'));
+        if (id === 'appearance') {
+            const hint=make('small', null, 'td-quick-color-hint');
+            const icon=make('span', null, 'td-quick-color-icon'); setProfileLayoutIcon(icon,'palette');
+            hint.append(icon, make('span', t('Choose colors with the palette icon above or in All settings.')));
+            controls.append(hint);
+        }
         group.append(controls);
         group.addEventListener('toggle', () => {
             if (group.open) openQuickSettingGroups.add(id);
@@ -2638,12 +2688,12 @@ function renderRail() {
     settings.dataset.deckCard = 'settings';
     cards.append(settings);
     setupCardSorting(cards);
-    panel.append(cards);
+    panelScroll.append(cards);
     root.append(panel);
     document.body.append(root);
-    panel.scrollTop=previousScroll;
+    panelScroll.scrollTop=previousScroll;
     requestAnimationFrame(() => {
-        if (document.getElementById('trophydeck-rail') === root) panel.scrollTop=previousScroll;
+        if (document.getElementById('trophydeck-rail') === root) panelScroll.scrollTop=previousScroll;
     });
     applyRailPosition();
 }
@@ -3176,6 +3226,39 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 #trophydeck-rail .td-account-links a:hover { background:var(--td-accent); }
 #trophydeck-rail .td-account-icon { display:flex; align-items:center; justify-content:center; flex:none; }
 #trophydeck-rail .td-account-icon svg { display:block; width:17px; height:17px; }
+/* Scrollable dialog content starts below the fixed header. */
+#trophydeck-settings.td-scroll-dialog, #trophydeck-guide.td-scroll-dialog, .td-dialog.td-scroll-dialog { display:flex; flex-direction:column; padding:0; overflow:hidden; }
+#trophydeck-settings.td-scroll-dialog h2, #trophydeck-guide.td-scroll-dialog h2, .td-dialog.td-scroll-dialog h2 { position:relative; top:auto; flex:none; margin:0; padding:14px 52px 14px 16px; border-radius:4px 4px 0 0; background:var(--td-accent); }
+.td-dialog-scroll { min-height:0; overflow:auto; padding:18px 22px 22px; scrollbar-color:var(--td-accent) var(--td-base); }
+.td-dialog-scroll::-webkit-scrollbar { width:10px; }
+.td-dialog-scroll::-webkit-scrollbar-track { background:var(--td-base); }
+.td-dialog-scroll::-webkit-scrollbar-thumb { background:var(--td-accent); border:2px solid var(--td-base); border-radius:8px; }
+#trophydeck-rail .epic-sort .epic-drag svg { width:16px; height:16px; display:block; }
+#trophydeck-settings .td-custom-colors { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:12px; }
+#trophydeck-settings .td-custom-colors label { display:flex; align-items:center; gap:6px; }
+#trophydeck-settings .td-custom-colors input[type="color"] { width:34px; height:28px; padding:0; border:0; cursor:pointer; background:transparent; }
+#trophydeck-rail .td-custom-group { border-bottom:0; }
+#trophydeck-rail .td-link-actions { display:flex; align-items:center; flex-wrap:wrap; gap:5px; border-top:1px solid var(--td-accent); padding-top:8px; margin-top:6px; }
+#trophydeck-rail .td-link-drag { cursor:grab; flex:none; }
+#trophydeck-rail .td-link-drag svg { display:block; width:15px; height:15px; }
+#trophydeck-rail .td-link-dragging { opacity:.5; }
+#trophydeck-rail .td-link-drop { outline:2px dashed #ffe600; outline-offset:-2px; }
+#trophydeck-rail .td-favorite { background:var(--td-favorite-color,var(--td-accent)); }
+#trophydeck-rail .td-favorite a { color:var(--td-favorite-text,#fff); }
+#trophydeck-rail .td-favorite-color { width:25px; height:24px; padding:0; border:0; background:transparent; cursor:pointer; }
+#trophydeck-rail .td-quick-color-hint { display:flex; align-items:flex-start; gap:6px; }
+#trophydeck-rail .td-quick-color-icon svg { display:block; width:16px; height:16px; flex:none; }
+#trophydeck-rail .td-favorite-controls button { padding:2px 3px; font-size:12px; }
+#trophydeck-rail .td-favorite-color { width:20px; height:20px; }
+#trophydeck-rail .td-favorite-drag { position:absolute; top:4px; left:4px; pointer-events:none; }
+#trophydeck-rail .td-favorite-drag svg { display:block; width:14px; height:14px; color:var(--td-favorite-text,#fff); }
+/* Keep the Trophy Deck scrollbar below its fixed header as well. */
+#trophydeck-rail .epic-panel { display:flex; flex-direction:column; overflow:hidden; }
+#trophydeck-rail .epic-header { position:relative; top:auto; flex:none; margin:-14px -14px 0; }
+#trophydeck-rail .epic-panel-scroll { flex:1 1 auto; min-height:0; overflow:auto; overflow-anchor:none; margin:0 -14px -14px; padding:14px; scrollbar-color:var(--td-accent) var(--td-base); }
+#trophydeck-rail .epic-panel-scroll::-webkit-scrollbar { width:10px; }
+#trophydeck-rail .epic-panel-scroll::-webkit-scrollbar-track { background:var(--td-base); }
+#trophydeck-rail .epic-panel-scroll::-webkit-scrollbar-thumb { background:var(--td-accent); border:2px solid var(--td-base); border-radius:8px; }
 `;
     document.head.append(style);
     applyTheme();
