@@ -1,4 +1,4 @@
-# Trophy Deck
+# Trophy Deck BETA
 
 Trophy Deck ergänzt PSNProfiles um ein anpassbares Deck, persönliche Notizen und frei anordbare Profilbereiche. Es kann zusammen mit PSNP+ verwendet werden.
 
