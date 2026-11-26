@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.41
+// @version      1.0.42
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.41";
+const APP_VERSION = "1.0.42";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -419,7 +419,7 @@ function openSettings() {
     pagePositionLabel.append(pagePositionValue, pagePosition);
     sections.profile.append(pagePositionLabel, make('small', t('Moves the page within the available empty space without changing its width. Centered keeps the original layout.'), 'td-setting-description'));
 
-    const layoutHint = make('small', t('Use “Edit profile layout” on a profile page to move or hide sections.'), 'epic-muted');
+    const layoutHint = make('small', t('Use “Edit profile layout” on a profile page to move or hide sections.'), 'epic-muted td-profile-layout-hint');
     const layoutReset = make('button', t('Restore profile layout'), 'epic-button');
     layoutReset.type = 'button';
     layoutReset.addEventListener('click', resetProfileLayout);
@@ -610,7 +610,7 @@ function openSettings() {
             const rail = document.getElementById('trophydeck-rail');
             if (rail) {
                 rail.style.setProperty('--epic-width', width.value + 'px');
-                updateRailOverlap(rail);
+                applyRailPosition();
             }
         });
     widthLabel.append(widthValue, width);
@@ -631,6 +631,22 @@ function openSettings() {
         });
     sideLabel.append(side);
     positionGroup.append(sideLabel);
+    const dockLabel = make('label', t('Horizontal anchor: '), 'epic-width');
+    const dock = make('select');
+    [['screen', t('Screen edge')], ['page', t('Page edge')]].forEach(([value, label]) => {
+        const option = make('option', label);
+        option.value = value;
+        dock.append(option);
+    });
+    dock.value = localStorage.getItem('trophydeck.horizontalAnchor') === 'page' ? 'page' : 'screen';
+    dock.addEventListener('change', () => {
+        localStorage.setItem('trophydeck.horizontalAnchor', dock.value);
+        logEvent('setting.horizontalAnchor');
+        applyRailPosition();
+    });
+    dockLabel.append(dock);
+    positionGroup.append(dockLabel, make('small', t('Page edge places the sidebar beside the page. If there is not enough space, it stays visible and may cover part of the page.'), 'td-setting-description'));
+
     const behaviorLabel=make('label',t("Deck behavior: "),'epic-width');
     const behavior=make('select');
     [['follow',t("Scroll until pinned to the top")],['fixed',t("Fixed on screen")]].forEach(([v,t])=>{
@@ -697,7 +713,7 @@ function openSettings() {
     const defaults=make('button',t("Restore Trophy Deck defaults"),'epic-button');
     defaults.type='button';
     defaults.addEventListener('click',()=>{
-            ['railWidth','panelHeight','positionPercent','positionMode','positionAnchorScroll','positionDocked','side'].forEach(k=>localStorage.removeItem('trophydeck.'+k));
+            ['railWidth','panelHeight','positionPercent','positionMode','positionAnchorScroll','positionDocked','side','horizontalAnchor'].forEach(k=>localStorage.removeItem('trophydeck.'+k));
             railOpen=true;
             localStorage.setItem('trophydeck.railOpen','true');
             logEvent('settings.resetDeck');
@@ -2145,11 +2161,47 @@ function updateRailOverlap(rail = document.getElementById('trophydeck-rail')) {
     rail.classList.toggle('td-rail-overlap', headerOverlap || menuOverlap);
 }
 
+// Keep the tab beside the page when closed and the full sidebar on screen when open.
+function pageDockLeft(page, viewportWidth, panelWidth, tabWidth, isLeft, closed) {
+    const total = panelWidth + tabWidth;
+    const clamp = (value, max) => Math.max(0, Math.min(Math.max(0, max), value));
+    if (closed) {
+        const tabLeft = clamp(isLeft ? page.left - tabWidth : page.right, viewportWidth - tabWidth);
+        return isLeft ? tabLeft : tabLeft - panelWidth;
+    }
+    return clamp(isLeft ? page.left - total : page.right, viewportWidth - total);
+}
+
+function applyRailHorizontalPosition(rail) {
+    if (localStorage.getItem('trophydeck.horizontalAnchor') !== 'page') {
+        rail.classList.remove('td-page-docked');
+        rail.style.removeProperty('left');
+        rail.style.removeProperty('right');
+        return;
+    }
+    const page = document.querySelector('#content')?.closest('.width');
+    const tab = rail.querySelector('.epic-tab');
+    const panel = rail.querySelector('.epic-panel');
+    if (!page || !tab || !panel) {
+        rail.classList.remove('td-page-docked');
+        rail.style.removeProperty('left');
+        rail.style.removeProperty('right');
+        return;
+    }
+    const viewport = document.documentElement.clientWidth || window.innerWidth;
+    const left = pageDockLeft(page.getBoundingClientRect(), viewport, panel.offsetWidth, tab.offsetWidth,
+        rail.classList.contains('epic-left'), rail.classList.contains('epic-closed'));
+    rail.classList.add('td-page-docked');
+    rail.style.left = left + 'px';
+    rail.style.right = 'auto';
+}
+
 function applyRailPosition() {
     const rail=document.getElementById('trophydeck-rail');
     if(!rail){
         return;
     }
+    applyRailHorizontalPosition(rail);
     const pct=Math.min(90,Math.max(0,Number(localStorage.getItem('trophydeck.positionPercent')||22)));
     const base=window.innerHeight*pct/100;
     const profile=profileInfo();
@@ -2771,6 +2823,7 @@ function renderRail() {
             railOpen = !railOpen;
             localStorage.setItem('trophydeck.railOpen', String(railOpen));
             updateTab();
+            applyRailHorizontalPosition(root);
         });
     updateTab();
     root.addEventListener('transitionend', event => { if (event.propertyName === 'transform') updateRailOverlap(root); });
@@ -3549,6 +3602,10 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 .width.td-page-shifted { position:relative; left:var(--td-page-offset, 0px) !important; }
 #trophydeck-settings .td-deck-group-icon { padding:0; line-height:0; }
 #trophydeck-settings .td-deck-group-icon svg { display:block; width:20px; height:20px; flex:none; }
+
+#trophydeck-settings .td-profile-layout-hint { display:block; margin-top:18px; padding-top:14px; border-top:1px solid color-mix(in srgb,var(--td-accent) 60%,transparent); }
+#trophydeck-rail.td-page-docked { transition:transform .28s ease, left .28s ease; }
+@media (prefers-reduced-motion:reduce) { #trophydeck-rail.td-page-docked { transition:none; } }
 `;
     document.head.append(style);
     applyTheme();

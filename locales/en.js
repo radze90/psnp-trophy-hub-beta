@@ -338,5 +338,9 @@ var __trophyDeckLocale_en = {
   "Centered": "Centered",
   "left": "left",
   "right": "right",
-  "Moves the page within the available empty space without changing its width. Centered keeps the original layout.": "Moves the page within the available empty space without changing its width. Centered keeps the original layout."
+  "Moves the page within the available empty space without changing its width. Centered keeps the original layout.": "Moves the page within the available empty space without changing its width. Centered keeps the original layout.",
+  "Horizontal anchor: ": "Horizontal anchor: ",
+  "Screen edge": "Screen edge",
+  "Page edge": "Page edge",
+  "Page edge places the sidebar beside the page. If there is not enough space, it stays visible and may cover part of the page.": "Page edge places the sidebar beside the page. If there is not enough space, it stays visible and may cover part of the page."
 };

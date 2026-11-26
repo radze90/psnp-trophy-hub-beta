@@ -338,5 +338,9 @@ var __trophyDeckLocale_de = {
   "Centered": "Zentriert",
   "left": "nach links",
   "right": "nach rechts",
-  "Moves the page within the available empty space without changing its width. Centered keeps the original layout.": "Verschiebt die Seite innerhalb des freien Platzes, ohne ihre Breite zu ändern. Zentriert entspricht der ursprünglichen Anordnung."
+  "Moves the page within the available empty space without changing its width. Centered keeps the original layout.": "Verschiebt die Seite innerhalb des freien Platzes, ohne ihre Breite zu ändern. Zentriert entspricht der ursprünglichen Anordnung.",
+  "Horizontal anchor: ": "Seitlich andocken: ",
+  "Screen edge": "Am Bildschirmrand",
+  "Page edge": "Am Seitenrand",
+  "Page edge places the sidebar beside the page. If there is not enough space, it stays visible and may cover part of the page.": "Am Seitenrand steht die Seitenleiste direkt neben dem Inhalt. Reicht der Platz nicht aus, bleibt sie sichtbar und kann einen Teil der Seite überdecken."
 };
