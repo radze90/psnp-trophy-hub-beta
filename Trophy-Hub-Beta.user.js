@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.38
+// @version      1.0.39
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.38";
+const APP_VERSION = "1.0.39";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -3437,9 +3437,19 @@ html.trophydeck-psnp-colors .td-unified-grid a[href*="rarity="] .typo-bottom { c
 .td-cabinet-empty { margin-bottom:10px; }
 /* Profile and global notes grow with their content. Game notes keep their own line limit. */
 .trophydeck-game-note.td-note-unlimited .td-note-preview { display:block; -webkit-line-clamp:unset; overflow:visible; }
-/* Keep navigation links grouped at the right, directly beside the edit control. */
-#trophydeck-sticky { justify-content:initial; }
-#trophydeck-sticky nav { margin-left:auto; }
+/* The navigation fills the remaining header space, with its links flush right. */
+#trophydeck-sticky { justify-content:flex-start; }
+#trophydeck-sticky > nav {
+    display:flex !important;
+    flex:1 1 auto;
+    min-width:0;
+    width:auto !important;
+    margin:0 !important;
+    justify-content:flex-end !important;
+    align-items:center;
+}
+#trophydeck-sticky > nav > a { flex:0 0 auto; }
+#trophydeck-sticky > .td-profile-layout-bar { flex:0 0 auto; }
 `;
     document.head.append(style);
     applyTheme();
