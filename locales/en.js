@@ -373,5 +373,10 @@ var __trophyDeckLocale_en = {
   "Pinned games": "Pinned games",
   "Unpin all": "Unpin all",
   "Unpin all games": "Unpin all games",
-  "Remove all pinned games from this profile? Game notes and cabinet entries will remain.": "Remove all pinned games from this profile? Game notes and cabinet entries will remain."
+  "Remove all pinned games from this profile? Game notes and cabinet entries will remain.": "Remove all pinned games from this profile? Game notes and cabinet entries will remain.",
+  "Pin games on profile pages": "Pin games on profile pages",
+  "Pin games to the top of any profile game list.": "Pin games to the top of any profile game list.",
+  "Unpin games on all profiles": "Unpin games on all profiles",
+  "Remove all pinned games on every profile? Game notes and cabinet entries will remain.": "Remove all pinned games on every profile? Game notes and cabinet entries will remain.",
+  "Remove saved pins from every profile in this browser.": "Remove saved pins from every profile in this browser."
 };

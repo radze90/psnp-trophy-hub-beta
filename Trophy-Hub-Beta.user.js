@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.54
+// @version      1.0.55
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.54";
+const APP_VERSION = "1.0.55";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -61,7 +61,7 @@ const features = [
     { key: 'trophydeck.cabinetNames', label: t("Show game names in cabinet"), defaultValue: false },
     { key: 'trophydeck.scrollButtons', label: t("Show scroll-to-bottom button"), defaultValue: true },
     { key: 'trophydeck.globalNote', label: t("Global note in the deck"), defaultValue: true },
-    { key: 'trophydeck.pinGames', label: t('Pin games in your profile'), defaultValue: true },
+    { key: 'trophydeck.pinGames', label: t('Pin games on profile pages'), defaultValue: true },
     { key: 'trophydeck.gameNotes', label: t("Show notes below games"), defaultValue: true },
     { key: 'trophydeck.stickyNav', label: t("Keep profile navigation visible when scrolling"), defaultValue: true },
     { key: 'trophydeck.customLinks', label: t("Custom links in the deck"), defaultValue: true },
@@ -198,7 +198,7 @@ function toggleControl(feature) {
     input.dataset.epicToggle = feature.key;
     const copy=make('span');
     copy.append(make('span',feature.label));
-    const descriptions={pinGames:t('Pin games to the top of your own game list.'),hidePsnpVersion:t('Hides the PSNP+ version below the site logo.'),showAccountLinks:t('Links to your own profile and account pages.'),hideFlaggedBox:t("Hides the leaderboard notice on profile pages."),showRail:t("Shows Trophy Deck as a collapsible sidebar."),showStats:t("Calculates additional profile statistics."),showLinks:t("Provides preset views of the game list."),showNote:t("A note for the profile currently displayed."),globalNote:t("The same note on every page."),favorites:t("Saves profile links as favorites."),cabinet:t("Use the star in the profile game list to save games to the cabinet."),cabinetNames:t("Shows shortened game names below covers."),scrollButtons:t("Adds a scroll-to-bottom button next to the scroll-to-top button."),customLinks:t("Manage your own links and categories."),gameNotes:t("Shows the same game note across profiles on this browser."),noteWrap:t("Displays long game notes over multiple lines."),stickyNav:t("Keeps the profile navigation with Profile, Trophy Log and Stats visible while scrolling."),psnpColors:t("Applies the selected theme to page headers and dialogs."),analytics:t("Counts selected actions locally; nothing is sent automatically.")};
+    const descriptions={pinGames:t('Pin games to the top of any profile game list.'),hidePsnpVersion:t('Hides the PSNP+ version below the site logo.'),showAccountLinks:t('Links to your own profile and account pages.'),hideFlaggedBox:t("Hides the leaderboard notice on profile pages."),showRail:t("Shows Trophy Deck as a collapsible sidebar."),showStats:t("Calculates additional profile statistics."),showLinks:t("Provides preset views of the game list."),showNote:t("A note for the profile currently displayed."),globalNote:t("The same note on every page."),favorites:t("Saves profile links as favorites."),cabinet:t("Use the star in the profile game list to save games to the cabinet."),cabinetNames:t("Shows shortened game names below covers."),scrollButtons:t("Adds a scroll-to-bottom button next to the scroll-to-top button."),customLinks:t("Manage your own links and categories."),gameNotes:t("Shows the same game note across profiles on this browser."),noteWrap:t("Displays long game notes over multiple lines."),stickyNav:t("Keeps the profile navigation with Profile, Trophy Log and Stats visible while scrolling."),psnpColors:t("Applies the selected theme to page headers and dialogs."),analytics:t("Counts selected actions locally; nothing is sent automatically.")};
     const desc=descriptions[feature.key.replace('trophydeck.','')];
     if(desc){
         copy.append(make('small',desc,'td-setting-description'));
@@ -428,6 +428,15 @@ function openSettings() {
     layoutReset.type = 'button';
     layoutReset.addEventListener('click', resetProfileLayout);
     sections.profile.append(layoutHint, layoutReset);
+    const clearAllPins = make('button', t('Unpin games on all profiles'), 'epic-button td-danger td-clear-all-pins');
+    clearAllPins.type = 'button';
+    clearAllPins.addEventListener('click', async () => {
+        if (await tdDialog(t('Unpin games on all profiles'), [], t('Remove all pinned games on every profile? Game notes and cabinet entries will remain.'))) {
+            clearAllProfilePins();
+        }
+    });
+    sections.profile.append(make('small', t('Remove saved pins from every profile in this browser.'), 'td-setting-description td-clear-pins-description'), clearAllPins);
+
 
     const languageLabel = make('label', t("Language") + ': ', 'epic-width');
     const languageSelect = make('select');
@@ -2374,7 +2383,8 @@ function usePageDock(anchor, page, viewportWidth, panelWidth, tabWidth, isLeft) 
 }
 
 function applyRailHorizontalPosition(rail) {
-    const page = document.querySelector('#content')?.closest('.width');
+    const content = document.querySelector('#content');
+    const page = content?.closest('.width') || content || document.querySelector('.title-bar')?.closest('.width');
     const tab = rail.querySelector('.epic-tab');
     const panel = rail.querySelector('.epic-panel');
     if (!tab || !panel) return;
@@ -2401,6 +2411,12 @@ function applyRailHorizontalPosition(rail) {
     }
 }
 
+// Prefer profile navigation; on other pages use their title or content edge.
+function railPositionAnchor() {
+    const profile = profileInfo();
+    return profile?.nav.closest('.title-bar') || document.querySelector('.title-bar') || document.querySelector('#content');
+}
+
 function applyRailPosition() {
     const rail=document.getElementById('trophydeck-rail');
     if(!rail){
@@ -2412,6 +2428,7 @@ function applyRailPosition() {
     const profile=profileInfo();
     const nav=profile?.nav.closest('.title-bar') || document.querySelector('.title-bar:has(.navigation)');
     const navRect=nav?.getBoundingClientRect();
+    const anchorRect=railPositionAnchor()?.getBoundingClientRect();
     const sticky=document.getElementById('trophydeck-sticky');
     const stickyRect=sticky&&!sticky.hidden?sticky.getBoundingClientRect():null;
     const fixed=localStorage.getItem('trophydeck.positionMode')==='fixed';
@@ -2426,8 +2443,8 @@ function applyRailPosition() {
         header.style.paddingBlock='2px';
         header.style.boxSizing='border-box';
     }
-    if(localStorage.getItem('trophydeck.positionMode')!=='fixed' && localStorage.getItem('trophydeck.positionDocked')!=='false' && navRect){
-        rail.style.top=Math.max(0,navRect.top)+'px';
+    if(localStorage.getItem('trophydeck.positionMode')!=='fixed' && localStorage.getItem('trophydeck.positionDocked')!=='false' && anchorRect){
+        rail.style.top=Math.max(0,anchorRect.top)+'px';
         updateRailOverlap(rail);
         return;
     }
@@ -2459,8 +2476,8 @@ function enableRailDragging(header) {
                 header.removeEventListener('pointerup',stop);
                 header.removeEventListener('pointercancel',stop);
                 if(moved){
-                    const nav=document.querySelector('.title-bar:has(.navigation)');
-                    const target=nav?Math.max(0,nav.getBoundingClientRect().top):null;
+                    const targetElement=railPositionAnchor();
+                    const target=targetElement?Math.max(0,targetElement.getBoundingClientRect().top):null;
                     const current=parseFloat(rail.style.top);
                     const dock=target!==null && Math.abs(current-target)<=24 && localStorage.getItem('trophydeck.positionMode')!=='fixed';
                     localStorage.setItem('trophydeck.positionDocked',String(dock));
@@ -2476,21 +2493,11 @@ function enableRailDragging(header) {
 }
 
 
-// Pins are local to the signed-in profile. The original rows stay in the
-// site's table, so PSNProfiles and PSNP+ can still filter them normally.
+// Pins are stored separately for each profile and stay local to this browser.
 const pinnedGameMarkers = new WeakMap();
 
-function isOwnGameProfile(profile) {
-    if (!profile || location.pathname.replace(/\/$/, '').toLowerCase() !== profile.path.toLowerCase()) return false;
-    const menu = document.querySelector('div.user-menu > div.dropdown.user-nav');
-    const identity = menu?.querySelector('a.dropdown-toggle[href]');
-    if (!identity) return false;
-    try {
-        const url = new URL(identity.href, location.href);
-        return url.origin === location.origin && url.pathname.replace(/\/$/, '').toLowerCase() === profile.path.toLowerCase();
-    } catch (_) {
-        return false;
-    }
+function isGameProfile(profile) {
+    return !!profile && location.pathname.replace(/\/$/, '').toLowerCase() === profile.path.toLowerCase();
 }
 
 function placeGameControls(cell) {
@@ -2572,8 +2579,7 @@ function createGamePinButton(id, profile) {
 
 function updatePinnedGames() {
     const profile = profileInfo();
-    const own = isOwnGameProfile(profile);
-    const active = own && enabled('trophydeck.pinGames');
+    const active = isGameProfile(profile) && enabled('trophydeck.pinGames');
     const saved = active ? readList(pinnedGamesKey(profile)).filter(id => typeof id === 'string') : [];
     if (active) restoreCachedPinnedRows(profile, saved);
     const groups = new Map();
@@ -2766,6 +2772,17 @@ function clearAllGamePins(profile) {
     updatePinnedGames();
 }
 
+function clearAllProfilePins() {
+    const keys = [];
+    for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (key && (key.startsWith('trophydeck.pinnedGames.') || key.startsWith('trophydeck.pinnedGameCache.'))) keys.push(key);
+    }
+    keys.forEach(key => localStorage.removeItem(key));
+    logEvent('game.unpinAllProfiles');
+    updatePinnedGames();
+}
+
 function updatePinnedHeader(parent) {
     const table = parent.closest('table');
     if (!table || table.querySelector('[data-td-pinned-header]')) return;
@@ -2778,9 +2795,9 @@ function updatePinnedHeader(parent) {
     clear.setAttribute('aria-label', clear.title);
     clear.addEventListener('click', async () => {
         const profile = profileInfo();
-        if (!isOwnGameProfile(profile)) return;
+        if (!isGameProfile(profile)) return;
         const confirmed = await tdDialog(t('Unpin all games'), [], t('Remove all pinned games from this profile? Game notes and cabinet entries will remain.'));
-        if (confirmed && isOwnGameProfile(profile)) clearAllGamePins(profile);
+        if (confirmed && isGameProfile(profile)) clearAllGamePins(profile);
     });
     content.append(make('span', t('Pinned games')), clear);
     header.append(content);
@@ -3317,6 +3334,7 @@ function renderRail() {
     }
     const root = make('aside');
     root.id = 'trophydeck-rail';
+    root.classList.add('td-initializing');
     root.style.setProperty('--epic-width', railWidth() + 'px');
     root.style.setProperty('--epic-height',(Number(localStorage.getItem('trophydeck.panelHeight'))||72)+'vh');
     const isLeft = localStorage.getItem('trophydeck.side') === 'left';
@@ -3488,6 +3506,10 @@ function renderRail() {
         if (document.getElementById('trophydeck-rail') === root) panelScroll.scrollTop=previousScroll;
     });
     applyRailPosition();
+    // Establish the saved state before enabling transitions, including on navigation.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (root.isConnected) root.classList.remove('td-initializing');
+    }));
 }
 
 function addMenuItem() {
@@ -4265,6 +4287,11 @@ caption[data-td-pinned-header] { caption-side:top; text-align:left; padding:7px 
 .td-unpin-all { border:0; border-radius:3px; padding:4px 8px; background:#b52e3d; color:#fff; font:600 11px/1.2 Arial,sans-serif; cursor:pointer; }
 .td-unpin-all:hover { filter:brightness(1.12); }
 .td-unpin-all:focus-visible { outline:2px solid white; outline-offset:2px; }
+
+/* No collapse animation while restoring the persisted state after navigation. */
+#trophydeck-rail.td-initializing, #trophydeck-rail.td-initializing .epic-panel { transition:none !important; }
+#trophydeck-settings .td-clear-pins-description { display:block; margin-top:16px; }
+#trophydeck-settings .td-clear-all-pins { margin-top:8px; }
 `;
     document.head.append(style);
 

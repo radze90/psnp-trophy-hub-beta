@@ -373,5 +373,10 @@ var __trophyDeckLocale_de = {
   "Pinned games": "Angeheftete Spiele",
   "Unpin all": "Alle Pins lösen",
   "Unpin all games": "Alle Spiele lösen",
-  "Remove all pinned games from this profile? Game notes and cabinet entries will remain.": "Alle angehefteten Spiele dieses Profils lösen? Spielnotizen und Cabinet-Einträge bleiben erhalten."
+  "Remove all pinned games from this profile? Game notes and cabinet entries will remain.": "Alle angehefteten Spiele dieses Profils lösen? Spielnotizen und Cabinet-Einträge bleiben erhalten.",
+  "Pin games on profile pages": "Spiele auf Profilseiten anheften",
+  "Pin games to the top of any profile game list.": "Heftet Spiele an den Anfang der Spieleliste eines beliebigen Profils.",
+  "Unpin games on all profiles": "Pins aller Profile löschen",
+  "Remove all pinned games on every profile? Game notes and cabinet entries will remain.": "Alle angehefteten Spiele auf allen Profilen lösen? Spielnotizen und Cabinet-Einträge bleiben erhalten.",
+  "Remove saved pins from every profile in this browser.": "Entfernt die gespeicherten Pins aller Profile in diesem Browser."
 };
