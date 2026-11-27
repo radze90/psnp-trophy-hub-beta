@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.55
+// @version      1.0.56
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.55";
+const APP_VERSION = "1.0.56";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -2411,10 +2411,15 @@ function applyRailHorizontalPosition(rail) {
     }
 }
 
-// Prefer profile navigation; on other pages use their title or content edge.
+// On the main overview pages the white content frame starts below the banner.
 function railPositionAnchor() {
     const profile = profileInfo();
-    return profile?.nav.closest('.title-bar') || document.querySelector('.title-bar') || document.querySelector('#content');
+    if (profile) return profile.nav.closest('.title-bar');
+    const content = document.querySelector('#content');
+    if (/^\/(?:games|guides|leaderboard|trophies|sessions)\/?$/i.test(location.pathname)) {
+        return content || document.querySelector('.title-bar');
+    }
+    return document.querySelector('.title-bar') || content;
 }
 
 function applyRailPosition() {
