@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.51
+// @version      1.0.52
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.51";
+const APP_VERSION = "1.0.52";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -2502,7 +2502,7 @@ function placeGameControls(cell) {
     const row = cell.closest('tr');
     const pin = row?.querySelector('.td-game-pin');
     if (!row || !pin) return;
-    const psnpAction = row.querySelector('.psnpp-list-button')?.closest('td');
+    const psnpAction = row.querySelector('.psnpp-list-button')?.parentElement;
     let ownCell = row.querySelector('td.td-game-pin-cell');
     if (psnpAction) {
         if (pin.parentElement !== psnpAction) psnpAction.append(pin);
@@ -2588,6 +2588,10 @@ function updatePinnedGames() {
         if (pinned && !row.dataset.tdPinnedCache) savePinnedRow(profile, id, row);
         if (button) {
             button.dataset.pinned = String(pinned);
+            const path = button.querySelector('svg path');
+            if (path) path.setAttribute('d', pinned
+                ? 'M8 3h8M9 3v5l-3 4v2h12v-2l-3-4V3M12 14v7'
+                : 'M8 3h8M9 3v5l-3 4v2h12v-2l-3-4V3M12 14v7M4 4l16 16');
             button.title = pinned ? t('Unpin game') : t('Pin game');
             button.setAttribute('aria-label', button.title + ': ' + link.textContent.trim());
             button.setAttribute('aria-pressed', String(pinned));
@@ -4202,15 +4206,13 @@ html.td-hide-psnp-version #header .logo > a[data-td-psnp-version] { display:none
 #trophydeck-rail .td-classic-status:not(:empty) { margin-top:6px; }
 
 /* Game note placeholders keep the row height stable on hover. */
-.td-game-pin { display:flex; align-items:center; justify-content:center; margin:5px auto 0; width:36px; height:26px; padding:4px; border:0; border-radius:2px; background:var(--td-accent); color:white; cursor:pointer; }
+.td-game-pin { display:flex; align-items:center; justify-content:center; margin:4px auto 0; width:36px; height:26px; padding:4px; border:0; border-radius:2px; background:color-mix(in srgb,var(--td-accent) 14%,transparent); color:var(--td-accent); cursor:pointer; }
 .td-game-pin svg { display:block; width:15px; height:15px; transform:rotate(40deg); }
 td.td-game-pin-cell { text-align:center; vertical-align:middle; }
 td.td-game-pin-cell .td-game-pin { margin:0 auto; }
-.td-game-pin[data-pinned="true"] { opacity:1 !important; }
-@media (hover:hover) and (pointer:fine) {
- .td-game-pin:not([data-pinned="true"]) { opacity:0; pointer-events:none; }
- tr:hover .td-game-pin, tr:focus-within .td-game-pin { opacity:1; pointer-events:auto; }
-}
+.td-game-pin[data-pinned="true"] { background:var(--td-accent); color:white; }
+.td-game-pin:hover, .td-game-pin:focus-visible { filter:brightness(.9); }
+
 
 caption[data-td-pinned-header] { caption-side:top; text-align:left; padding:7px 10px; color:#fff; background:var(--td-accent,#315c89); font-weight:bold; text-transform:uppercase; font-size:12px; }
 
