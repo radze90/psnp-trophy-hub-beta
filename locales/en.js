@@ -360,5 +360,10 @@ var __trophyDeckLocale_en = {
   "Notes, favorites and settings": "Notes, favorites and settings",
   "Save game and profile notes, favorite players and links locally. Adjust appearance and position in settings, and export a backup when needed.": "Save game and profile notes, favorite players and links locally. Adjust appearance and position in settings, and export a backup when needed.",
   "Get started": "Get started",
-  "Next": "Next"
+  "Next": "Next",
+  "Loads all games if needed, then filters using PSNP+.": "Loads all games if needed, then filters using PSNP+.",
+  "Loading all games through PSNP+. Please keep this page open.": "Loading all games through PSNP+. Please keep this page open.",
+  "Loading did not finish. Please try again or use the PSNP+ load button.": "Loading did not finish. Please try again or use the PSNP+ load button.",
+  "Please load all games with PSNP+ before applying this filter.": "Please load all games with PSNP+ before applying this filter.",
+  "The PSNP+ platform filter is no longer available.": "The PSNP+ platform filter is no longer available."
 };

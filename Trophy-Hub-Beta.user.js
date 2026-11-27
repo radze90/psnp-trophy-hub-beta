@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.46
+// @version      1.0.47
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.46";
+const APP_VERSION = "1.0.47";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -1093,27 +1093,86 @@ function addLinks(panel, profile) {
             }
             platform.append(a);
         });
-    // PSNP+ implements classic filters against its own tags and loaded rows.
-    // Calling its existing controls keeps both extensions in sync.
+    // PSNP+ owns the classic-platform data and filters the loaded rows.
+    const classicPlatforms = make('div', null, 'td-platforms td-classic-platforms');
     ['PS1', 'PS2', 'PSP'].forEach(name => {
         const button = make('button', name, 'td-classic-filter');
         button.type = 'button';
         button.dataset.tdClassicPlatform = name;
-        button.addEventListener('click', () => {
-            const option = findPsnpClassicFilter(name);
-            if (option) {
-                option.click();
-                logEvent('platform.' + name.toLowerCase());
-                syncPsnpClassicFilters();
-            }
-        });
-        platform.append(button);
+        button.addEventListener('click', () => applyClassicPlatformFilter(name));
+        classicPlatforms.append(button);
     });
+    const status = make('small', '', 'td-classic-status');
+    status.dataset.tdClassicStatus = 'true';
+    status.setAttribute('role', 'status');
     const platformSection = make('div', null, 'td-platform-section');
-    platformSection.append(make('small',t("Platform"),'epic-muted'), platform);
+    platformSection.append(make('small', t('Platform'), 'epic-muted'), platform, classicPlatforms, status);
     box.append(platformSection);
     panel.append(box);
     syncPsnpClassicFilters(box);
+}
+
+let classicPlatformLoading = false;
+let classicPlatformStatus = '';
+
+function classicLoadButton(option) {
+    const title = option?.closest('.title');
+    const icon = title?.querySelector('a > i.fa-arrow-circle-down, a > i.fa-spinner.fa-spin');
+    return icon?.closest('a') || null;
+}
+
+// PSNP+ removes its load-all button only after the final page has loaded.
+function waitForPsnpLoadAll(button) {
+    return new Promise((resolve, reject) => {
+        const observer = new MutationObserver(() => {
+            if (!button.isConnected) finish();
+        });
+        const timer = setTimeout(() => finish(new Error('timeout')), 30 * 60 * 1000);
+        function finish(error) {
+            observer.disconnect();
+            clearTimeout(timer);
+            if (error) reject(error); else resolve();
+        }
+        observer.observe(document.body, {childList:true, subtree:true});
+        // A spinning button means PSNP+ is already loading the list.
+        if (!button.querySelector('i.fa-spinner.fa-spin')) button.click();
+        if (!button.isConnected) finish();
+    });
+}
+
+async function applyClassicPlatformFilter(name) {
+    if (classicPlatformLoading) return;
+    let option = findPsnpClassicFilter(name);
+    if (!option) return;
+    const loader = classicLoadButton(option);
+    if (loader) {
+        classicPlatformLoading = true;
+        classicPlatformStatus = t('Loading all games through PSNP+. Please keep this page open.');
+        syncPsnpClassicFilters();
+        try {
+            await waitForPsnpLoadAll(loader);
+        } catch (_) {
+            classicPlatformStatus = t('Loading did not finish. Please try again or use the PSNP+ load button.');
+            classicPlatformLoading = false;
+            syncPsnpClassicFilters();
+            return;
+        }
+        classicPlatformLoading = false;
+        option = findPsnpClassicFilter(name);
+    } else if (document.querySelector('#load-more')) {
+        classicPlatformStatus = t('Please load all games with PSNP+ before applying this filter.');
+        syncPsnpClassicFilters();
+        return;
+    }
+    if (!option) {
+        classicPlatformStatus = t('The PSNP+ platform filter is no longer available.');
+        syncPsnpClassicFilters();
+        return;
+    }
+    classicPlatformStatus = '';
+    option.click();
+    logEvent('platform.' + name.toLowerCase());
+    syncPsnpClassicFilters();
 }
 
 function findPsnpClassicFilter(name) {
@@ -1130,12 +1189,15 @@ function syncPsnpClassicFilters(scope = document) {
     scope.querySelectorAll('[data-td-classic-platform]').forEach(button => {
         const name = button.dataset.tdClassicPlatform;
         const option = findPsnpClassicFilter(name);
-        button.disabled = !option;
-        button.title = option ? t('Filters the currently loaded games using PSNP+.') : t('Requires the classic platform filters in PSNP+.');
+        button.disabled = !option || classicPlatformLoading;
+        button.title = option ? t('Loads all games if needed, then filters using PSNP+.') : t('Requires the classic platform filters in PSNP+.');
         const toggle = option?.closest('.dropdown')?.querySelector('a.dropdown-toggle.platform');
         const active = !!toggle && new RegExp('\\(' + name + '\\)', 'i').test(toggle.textContent);
         button.classList.toggle('active', active);
         button.setAttribute('aria-pressed', String(active));
+    });
+    scope.querySelectorAll('[data-td-classic-status]').forEach(status => {
+        if (status.textContent !== classicPlatformStatus) status.textContent = classicPlatformStatus;
     });
 }
 
@@ -3849,6 +3911,13 @@ html.td-hide-psnp-version #header .logo > a[data-td-psnp-version] { display:none
 #trophydeck-welcome .td-welcome-controls { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:18px; }
 #trophydeck-welcome .td-welcome-controls button:disabled { opacity:.4; cursor:default; }
 #trophydeck-welcome .td-welcome-progress { color:#c8d6e6; font-size:12px; }
+
+/* Classic platforms have their own row and a deeper background. */
+#trophydeck-rail .td-classic-platforms { margin-top:6px; }
+#trophydeck-rail .td-classic-platforms button { background:color-mix(in srgb,var(--td-base) 78%,var(--td-accent)); border:1px solid color-mix(in srgb,var(--td-accent) 55%,transparent); }
+#trophydeck-rail .td-classic-platforms button:hover:not(:disabled), #trophydeck-rail .td-classic-platforms button.active { background:var(--td-accent); }
+#trophydeck-rail .td-classic-status { display:block; color:#c7d6e4; font-size:11px; line-height:1.4; }
+#trophydeck-rail .td-classic-status:not(:empty) { margin-top:6px; }
 `;
     document.head.append(style);
 

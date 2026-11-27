@@ -360,5 +360,10 @@ var __trophyDeckLocale_de = {
   "Notes, favorites and settings": "Notizen, Favoriten und Einstellungen",
   "Save game and profile notes, favorite players and links locally. Adjust appearance and position in settings, and export a backup when needed.": "Speichere Spiel- und Profilnotizen, Spielerfavoriten und Links lokal. Passe Darstellung und Position in den Einstellungen an und exportiere bei Bedarf ein Backup.",
   "Get started": "Los geht’s",
-  "Next": "Weiter"
+  "Next": "Weiter",
+  "Loads all games if needed, then filters using PSNP+.": "Lädt bei Bedarf alle Spiele und filtert anschließend über PSNP+.",
+  "Loading all games through PSNP+. Please keep this page open.": "Alle Spiele werden über PSNP+ geladen. Bitte lass diese Seite geöffnet.",
+  "Loading did not finish. Please try again or use the PSNP+ load button.": "Das Laden wurde nicht abgeschlossen. Bitte versuche es erneut oder nutze den Ladebutton von PSNP+.",
+  "Please load all games with PSNP+ before applying this filter.": "Bitte lade vor dem Filtern alle Spiele über PSNP+.",
+  "The PSNP+ platform filter is no longer available.": "Der Plattformfilter von PSNP+ ist nicht mehr verfügbar."
 };
