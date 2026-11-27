@@ -370,5 +370,8 @@ var __trophyDeckLocale_de = {
   "Pin games to the top of your own game list.": "Heftet Spiele an den Anfang deiner eigenen Spieleliste.",
   "Pin game": "Spiel anheften",
   "Unpin game": "Spiel lösen",
-  "Pinned games": "Angeheftete Spiele"
+  "Pinned games": "Angeheftete Spiele",
+  "Unpin all": "Alle Pins lösen",
+  "Unpin all games": "Alle Spiele lösen",
+  "Remove all pinned games from this profile? Game notes and cabinet entries will remain.": "Alle angehefteten Spiele dieses Profils lösen? Spielnotizen und Cabinet-Einträge bleiben erhalten."
 };

@@ -370,5 +370,8 @@ var __trophyDeckLocale_en = {
   "Pin games to the top of your own game list.": "Pin games to the top of your own game list.",
   "Pin game": "Pin game",
   "Unpin game": "Unpin game",
-  "Pinned games": "Pinned games"
+  "Pinned games": "Pinned games",
+  "Unpin all": "Unpin all",
+  "Unpin all games": "Unpin all games",
+  "Remove all pinned games from this profile? Game notes and cabinet entries will remain.": "Remove all pinned games from this profile? Game notes and cabinet entries will remain."
 };

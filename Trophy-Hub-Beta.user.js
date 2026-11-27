@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.52
+// @version      1.0.53
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.52";
+const APP_VERSION = "1.0.53";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -2542,7 +2542,12 @@ function createGamePinButton(id, profile) {
     icon.setAttribute('stroke-linejoin', 'round');
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', 'M8 3h8M9 3v5l-3 4v2h12v-2l-3-4V3M12 14v7');
-    icon.append(path);
+    path.setAttribute('transform', 'rotate(40 12 12)');
+    const cross = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    cross.setAttribute('class', 'td-unpin-mark');
+    cross.setAttribute('d', 'M16 3l5 5M21 3l-5 5');
+    cross.style.display = 'none';
+    icon.append(path, cross);
     button.append(icon);
     button.addEventListener('click', () => {
         const key = pinnedGamesKey(profile);
@@ -2588,10 +2593,8 @@ function updatePinnedGames() {
         if (pinned && !row.dataset.tdPinnedCache) savePinnedRow(profile, id, row);
         if (button) {
             button.dataset.pinned = String(pinned);
-            const path = button.querySelector('svg path');
-            if (path) path.setAttribute('d', pinned
-                ? 'M8 3h8M9 3v5l-3 4v2h12v-2l-3-4V3M12 14v7'
-                : 'M8 3h8M9 3v5l-3 4v2h12v-2l-3-4V3M12 14v7M4 4l16 16');
+            const unpinMark = button.querySelector('.td-unpin-mark');
+            if (unpinMark) unpinMark.style.display = pinned ? '' : 'none';
             button.title = pinned ? t('Unpin game') : t('Pin game');
             button.setAttribute('aria-label', button.title + ': ' + link.textContent.trim());
             button.setAttribute('aria-pressed', String(pinned));
@@ -2742,11 +2745,37 @@ function restoreCachedPinnedRows(profile, saved) {
     });
 }
 
+function clearAllGamePins(profile) {
+    const prefix = 'trophydeck.pinnedGameCache.' + profile.path.toLowerCase() + '.';
+    const cacheKeys = [];
+    for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (key?.startsWith(prefix)) cacheKeys.push(key);
+    }
+    localStorage.removeItem(pinnedGamesKey(profile));
+    cacheKeys.forEach(key => localStorage.removeItem(key));
+    logEvent('game.unpinAll');
+    updatePinnedGames();
+}
+
 function updatePinnedHeader(parent) {
     const table = parent.closest('table');
     if (!table || table.querySelector('[data-td-pinned-header]')) return;
-    const header = make('caption', t('Pinned games'));
+    const header = make('caption');
     header.dataset.tdPinnedHeader = 'true';
+    const content = make('div', null, 'td-pinned-header-content');
+    const clear = make('button', t('Unpin all'), 'td-unpin-all');
+    clear.type = 'button';
+    clear.title = t('Unpin all games');
+    clear.setAttribute('aria-label', clear.title);
+    clear.addEventListener('click', async () => {
+        const profile = profileInfo();
+        if (!isOwnGameProfile(profile)) return;
+        const confirmed = await tdDialog(t('Unpin all games'), [], t('Remove all pinned games from this profile? Game notes and cabinet entries will remain.'));
+        if (confirmed && isOwnGameProfile(profile)) clearAllGamePins(profile);
+    });
+    content.append(make('span', t('Pinned games')), clear);
+    header.append(content);
     table.insertBefore(header, table.firstChild);
 }
 
@@ -4207,7 +4236,7 @@ html.td-hide-psnp-version #header .logo > a[data-td-psnp-version] { display:none
 
 /* Game note placeholders keep the row height stable on hover. */
 .td-game-pin { display:flex; align-items:center; justify-content:center; margin:4px auto 0; width:36px; height:26px; padding:4px; border:0; border-radius:2px; background:color-mix(in srgb,var(--td-accent) 14%,transparent); color:var(--td-accent); cursor:pointer; }
-.td-game-pin svg { display:block; width:15px; height:15px; transform:rotate(40deg); }
+.td-game-pin svg { display:block; width:17px; height:17px; }
 td.td-game-pin-cell { text-align:center; vertical-align:middle; }
 td.td-game-pin-cell .td-game-pin { margin:0 auto; }
 .td-game-pin[data-pinned="true"] { background:var(--td-accent); color:white; }
@@ -4223,6 +4252,11 @@ caption[data-td-pinned-header] { caption-side:top; text-align:left; padding:7px 
 #gamesTable tr.td-pinned-game > td:first-child::before { left:0; }
 #gamesTable tr.td-pinned-game > td:last-child::after { right:0; }
 #gamesTable tr.td-pinned-game + tr:not(.td-pinned-game) > td { border-top:3px solid var(--td-accent); }
+
+.td-pinned-header-content { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.td-unpin-all { border:0; border-radius:3px; padding:4px 8px; background:#b52e3d; color:#fff; font:600 11px/1.2 Arial,sans-serif; cursor:pointer; }
+.td-unpin-all:hover { filter:brightness(1.12); }
+.td-unpin-all:focus-visible { outline:2px solid white; outline-offset:2px; }
 `;
     document.head.append(style);
 
