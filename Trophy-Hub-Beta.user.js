@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.50
+// @version      1.0.51
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.50";
+const APP_VERSION = "1.0.51";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -2642,6 +2642,12 @@ function cleanPinnedRow(row) {
     clone.removeAttribute('id');
     clone.removeAttribute('style');
     clone.classList.remove('td-pinned-game');
+    // PSNP+ appends its own markers and links inside the title span.
+    // Retain only the original game link so those markers are never cached.
+    const title = clone.querySelector('a.title[href*="/trophies/"]');
+    const titleSpan = title?.closest('span');
+    if (titleSpan) titleSpan.replaceChildren(title);
+    clone.querySelectorAll('.psnpp-guide-info-profile, [class*="psnpp-platform-"]').forEach(element => element.remove());
     // PSNP+ actions have live handlers and cannot be copied as inert HTML.
     clone.querySelectorAll('.psnpp-list-button').forEach(button => {
         const cell = button.closest('td');
@@ -2652,7 +2658,7 @@ function cleanPinnedRow(row) {
     [clone, ...clone.querySelectorAll('*')].forEach(element => {
         for (const attribute of Array.from(element.attributes)) {
             const name = attribute.name.toLowerCase();
-            if (name === 'id' || name === 'srcdoc' || name.startsWith('on')) element.removeAttribute(attribute.name);
+            if (name === 'id' || name === 'srcdoc' || name.startsWith('on') || name.startsWith('data-psnpp-')) element.removeAttribute(attribute.name);
             if (['href', 'src'].includes(name) && /^\s*(?:javascript|data|vbscript):/i.test(attribute.value)) element.removeAttribute(attribute.name);
         }
     });
@@ -2668,6 +2674,30 @@ function savePinnedRow(profile, id, row) {
     } catch (_) {
         // Storage may be full. The live row remains usable.
     }
+}
+
+// Older beta versions cached PSNP+ decorations. Remove them from existing
+// entries as well, including entries for games not currently on screen.
+function migratePinnedCaches() {
+    const keys = [];
+    for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (key?.startsWith('trophydeck.pinnedGameCache.')) keys.push(key);
+    }
+    keys.forEach(key => {
+        try {
+            const cached = JSON.parse(localStorage.getItem(key) || 'null');
+            if (!cached || cached.version !== 1 || typeof cached.html !== 'string' || cached.html.length > 100000) return;
+            const template = document.createElement('template');
+            template.innerHTML = cached.html;
+            const row = template.content.firstElementChild;
+            if (!row || row.tagName !== 'TR') return;
+            const value = JSON.stringify({version:1, html:cleanPinnedRow(row).outerHTML});
+            if (value !== localStorage.getItem(key)) localStorage.setItem(key, value);
+        } catch (_) {
+            // Ignore damaged or inaccessible entries without changing other data.
+        }
+    });
 }
 
 function restoreCachedPinnedRows(profile, saved) {
@@ -3784,7 +3814,7 @@ html.td-has-scroll-down a.scroll-top { transform:translateX(calc(-100% - 8px)); 
 #trophydeck-rail .td-platforms { display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
 #trophydeck-rail .td-platforms a { padding:4px 7px; border-radius:3px; color:#fff; text-decoration:none; background:color-mix(in srgb,var(--td-accent) 32%,transparent); font-size:12px; }
 #trophydeck-rail .td-platforms a:hover,#trophydeck-rail .td-platforms a.active { background:var(--td-accent); }
-.td-cabinet-add { background:none; border:0; padding:0 3px; color:var(--td-accent); cursor:pointer; font-size:18px; }
+.td-cabinet-add { background:none; border:0; padding:0 3px; color:var(--td-accent); cursor:pointer; font-size:16px; line-height:1; position:relative; top:1px; vertical-align:baseline; }
 .td-cabinet-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:6px; padding:8px; margin-bottom:10px; }
 .td-cabinet-grid img { display:block; width:100%; aspect-ratio:1; object-fit:cover; }
 #td-scroll-bottom { position:fixed; bottom:20px; right:88px; z-index:1000; width:60px; height:60px; cursor:pointer; border:0; border-radius:3px; background:var(--td-accent); color:white; display:flex; align-items:center; justify-content:center; font-size:20px; }
@@ -4172,8 +4202,8 @@ html.td-hide-psnp-version #header .logo > a[data-td-psnp-version] { display:none
 #trophydeck-rail .td-classic-status:not(:empty) { margin-top:6px; }
 
 /* Game note placeholders keep the row height stable on hover. */
-.td-game-pin { display:flex; align-items:center; justify-content:center; margin:5px auto 0; width:30px; height:24px; padding:3px; border:0; background:transparent; color:var(--td-accent); cursor:pointer; }
-.td-game-pin svg { display:block; width:16px; height:16px; }
+.td-game-pin { display:flex; align-items:center; justify-content:center; margin:5px auto 0; width:36px; height:26px; padding:4px; border:0; border-radius:2px; background:var(--td-accent); color:white; cursor:pointer; }
+.td-game-pin svg { display:block; width:15px; height:15px; transform:rotate(40deg); }
 td.td-game-pin-cell { text-align:center; vertical-align:middle; }
 td.td-game-pin-cell .td-game-pin { margin:0 auto; }
 .td-game-pin[data-pinned="true"] { opacity:1 !important; }
@@ -4186,7 +4216,10 @@ caption[data-td-pinned-header] { caption-side:top; text-align:left; padding:7px 
 
 /* Keep pinned rows visually distinct without adding fake game rows. */
 #gamesTable tr.td-pinned-game > td { background:color-mix(in srgb,var(--td-accent) 10%,#f5f6f8); }
-#gamesTable tr.td-pinned-game > td:first-child { box-shadow:inset 3px 0 var(--td-accent); }
+#gamesTable tr.td-pinned-game > td:first-child, #gamesTable tr.td-pinned-game > td:last-child { position:relative; }
+#gamesTable tr.td-pinned-game > td:first-child::before, #gamesTable tr.td-pinned-game > td:last-child::after { content:""; position:absolute; top:-3px; bottom:-3px; width:3px; background:var(--td-accent); pointer-events:none; z-index:1; }
+#gamesTable tr.td-pinned-game > td:first-child::before { left:0; }
+#gamesTable tr.td-pinned-game > td:last-child::after { right:0; }
 #gamesTable tr.td-pinned-game + tr:not(.td-pinned-game) > td { border-top:3px solid var(--td-accent); }
 `;
     document.head.append(style);
@@ -4195,6 +4228,7 @@ caption[data-td-pinned-header] { caption-side:top; text-align:left; padding:7px 
     markPsnpVersionLabel();
     applyPagePosition();
     migrateGameNotes();
+    migratePinnedCaches();
     updateFlagged();
     renderRail();
     updateStickyNav();
