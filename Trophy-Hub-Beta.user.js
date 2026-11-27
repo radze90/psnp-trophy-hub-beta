@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.59
+// @version      1.0.60
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.59";
+const APP_VERSION = "1.0.60";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -3372,12 +3372,52 @@ function catalogPlatforms(container) {
     return Array.from(platforms).sort();
 }
 
+// On a profile-specific trophy page, og:title may start with "Player's".
+// Strip the exact profile first. For old records, compare the remaining title
+// against the public URL slug so real names such as Assassin's Creed survive.
+function catalogSafeTitle(value, slug, profileName = '') {
+    let name = String(value || '').trim();
+    if (profileName) {
+        const lower = name.toLocaleLowerCase();
+        for (const apostrophe of ["'s ", '’s ']) {
+            const prefix = (profileName + apostrophe).toLocaleLowerCase();
+            if (lower.startsWith(prefix)) { name = name.slice(prefix.length).trim(); break; }
+        }
+    }
+    const possessive = name.match(/^([A-Za-z0-9_-]{1,32})['’]s\s+(.+)$/);
+    if (!possessive) return name;
+    function comparable(text) {
+        let decoded = String(text || '');
+        try { decoded = decodeURIComponent(decoded); } catch (_) {}
+        return decoded.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+    }
+    const slugKey = comparable(slug);
+    if (slugKey && comparable(name) === slugKey) return name;
+    if (slugKey && comparable(possessive[2]) === slugKey) return possessive[2];
+    // Ambiguous old names must not leak a possible profile name. Preserve the
+    // actual title if known on a later visit; otherwise use the public slug.
+    let fallback = String(slug || '').replace(/-/g, ' ').trim();
+    try { fallback = decodeURIComponent(fallback); } catch (_) {}
+    return fallback || possessive[2];
+}
+
 function readGameCatalog() {
     const raw = localStorage.getItem(GAME_CATALOG_KEY);
     if (raw === null) return {records:{}};
     try {
         const value = JSON.parse(raw);
-        if (value && value.version === 1 && value.records && typeof value.records === 'object' && !Array.isArray(value.records)) return value;
+        if (value && value.version === 1 && value.records && typeof value.records === 'object' && !Array.isArray(value.records)) {
+            let changed = false;
+            Object.values(value.records).forEach(record => {
+                if (!record || typeof record.name !== 'string' || typeof record.slug !== 'string') return;
+                const safe = catalogSafeTitle(record.name, record.slug);
+                if (safe !== record.name) { record.name = safe; changed = true; }
+            });
+            if (changed) {
+                try { localStorage.setItem(GAME_CATALOG_KEY, JSON.stringify(value)); } catch (_) {}
+            }
+            return value;
+        }
     } catch (_) {}
     return null;
 }
@@ -3390,7 +3430,11 @@ function parseCatalogPage() {
     const pageMatch = location.pathname.match(/^\/trophies\/(\d+)-/);
     if (!pageMatch || Number(pageMatch[1]) !== current.id) return null;
     const titleMeta = document.querySelector('meta[property="og:title"]');
-    const name = (titleMeta?.content || '').replace(/\s+Trophies\s*$/i, '').trim();
+    const title = (titleMeta?.content || '').replace(/\s+Trophies\s*$/i, '').trim();
+    const profileSegment = location.pathname.match(/^\/trophies\/\d+-[^/]+\/([^/]+)\/?$/)?.[1] || '';
+    let profileName = profileSegment;
+    try { profileName = decodeURIComponent(profileSegment); } catch (_) {}
+    const name = catalogSafeTitle(title, current.slug, profileName);
     if (!name) return null;
     const image = document.querySelector('#content .game-image-holder');
     const details = image?.nextElementSibling;
@@ -3497,7 +3541,7 @@ function exportGameCatalogData(catalog) {
         }
         group.sort((a,b) => a.id - b.id);
         const named = group.find(entry => entry.detail) || group[0];
-        games.push({name:named.name, lists:group.map(entry => ({id:entry.id, slug:entry.slug, p:entry.p || [], r:entry.r || null}))});
+        games.push({name:catalogSafeTitle(named.name, named.slug), lists:group.map(entry => ({id:entry.id, slug:entry.slug, p:entry.p || [], r:entry.r || null}))});
     });
     return {v:1, games};
 }
