@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.53
+// @version      1.0.54
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.53";
+const APP_VERSION = "1.0.54";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -2543,11 +2543,19 @@ function createGamePinButton(id, profile) {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', 'M8 3h8M9 3v5l-3 4v2h12v-2l-3-4V3M12 14v7');
     path.setAttribute('transform', 'rotate(40 12 12)');
-    const cross = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    cross.setAttribute('class', 'td-unpin-mark');
-    cross.setAttribute('d', 'M16 3l5 5M21 3l-5 5');
-    cross.style.display = 'none';
-    icon.append(path, cross);
+    // The background-colored wider stroke separates the diagonal from the pin.
+    const unpinMark = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    unpinMark.setAttribute('class', 'td-unpin-mark');
+    unpinMark.style.display = 'none';
+    const gap = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    gap.setAttribute('d', 'M3 3L21 21');
+    gap.setAttribute('stroke', 'var(--td-accent, #315c89)');
+    gap.setAttribute('stroke-width', '4');
+    const slash = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    slash.setAttribute('d', 'M3 3L21 21');
+    slash.setAttribute('stroke-width', '1.8');
+    unpinMark.append(gap, slash);
+    icon.append(path, unpinMark);
     button.append(icon);
     button.addEventListener('click', () => {
         const key = pinnedGamesKey(profile);
