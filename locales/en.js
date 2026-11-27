@@ -344,5 +344,21 @@ var __trophyDeckLocale_en = {
   "Page edge": "Page edge",
   "Page edge places the sidebar beside the page. If there is not enough space, it stays visible and may cover part of the page.": "Page edge places the sidebar beside the page. If there is not enough space, it stays visible and may cover part of the page.",
   "Automatic (when space allows)": "Automatic (when space allows)",
-  "Automatic docks beside the page when the entire sidebar fits. Otherwise it stays at the screen edge. Page edge can overlap the page when space is tight.": "Automatic docks beside the page when the entire sidebar fits. Otherwise it stays at the screen edge. Page edge can overlap the page when space is tight."
+  "Automatic docks beside the page when the entire sidebar fits. Otherwise it stays at the screen edge. Page edge can overlap the page when space is tight.": "Automatic docks beside the page when the entire sidebar fits. Otherwise it stays at the screen edge. Page edge can overlap the page when space is tight.",
+  "Hide PSNP+ version label": "Hide PSNP+ version label",
+  "Hides the PSNP+ version below the site logo.": "Hides the PSNP+ version below the site logo.",
+  "Show welcome guide": "Show welcome guide",
+  "Filters the currently loaded games using PSNP+.": "Filters the currently loaded games using PSNP+.",
+  "Requires the classic platform filters in PSNP+.": "Requires the classic platform filters in PSNP+.",
+  "Welcome to Trophy Hub": "Welcome to Trophy Hub",
+  "Your personal trophy dashboard": "Your personal trophy dashboard",
+  "Trophy Hub adds a customizable sidebar and useful features to PSNProfiles. It also works alongside PSNP+.": "Trophy Hub adds a customizable sidebar and useful features to PSNProfiles. It also works alongside PSNP+.",
+  "Your sidebar": "Your sidebar",
+  "Open or collapse the sidebar with its arrow. Rearrange sections, use quick filters and open settings or colors from the header.": "Open or collapse the sidebar with its arrow. Rearrange sections, use quick filters and open settings or colors from the header.",
+  "Arrange your profile": "Arrange your profile",
+  "Use the edit button in the profile navigation to move, resize or hide profile sections. Restore the original arrangement whenever you like.": "Use the edit button in the profile navigation to move, resize or hide profile sections. Restore the original arrangement whenever you like.",
+  "Notes, favorites and settings": "Notes, favorites and settings",
+  "Save game and profile notes, favorite players and links locally. Adjust appearance and position in settings, and export a backup when needed.": "Save game and profile notes, favorite players and links locally. Adjust appearance and position in settings, and export a backup when needed.",
+  "Get started": "Get started",
+  "Next": "Next"
 };

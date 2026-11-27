@@ -344,5 +344,21 @@ var __trophyDeckLocale_de = {
   "Page edge": "Am Seitenrand",
   "Page edge places the sidebar beside the page. If there is not enough space, it stays visible and may cover part of the page.": "Am Seitenrand steht die Seitenleiste direkt neben dem Inhalt. Reicht der Platz nicht aus, bleibt sie sichtbar und kann einen Teil der Seite überdecken.",
   "Automatic (when space allows)": "Automatisch (wenn genug Platz ist)",
-  "Automatic docks beside the page when the entire sidebar fits. Otherwise it stays at the screen edge. Page edge can overlap the page when space is tight.": "Automatisch dockt neben der Seite an, wenn die gesamte Seitenleiste Platz hat. Andernfalls bleibt sie am Bildschirmrand. Bei „Am Seitenrand“ kann sie die Seite bei Platzmangel überdecken."
+  "Automatic docks beside the page when the entire sidebar fits. Otherwise it stays at the screen edge. Page edge can overlap the page when space is tight.": "Automatisch dockt neben der Seite an, wenn die gesamte Seitenleiste Platz hat. Andernfalls bleibt sie am Bildschirmrand. Bei „Am Seitenrand“ kann sie die Seite bei Platzmangel überdecken.",
+  "Hide PSNP+ version label": "PSNP+-Versionsanzeige ausblenden",
+  "Hides the PSNP+ version below the site logo.": "Blendet die PSNP+-Version unter dem Seitenlogo aus.",
+  "Show welcome guide": "Willkommensanleitung anzeigen",
+  "Filters the currently loaded games using PSNP+.": "Filtert die aktuell geladenen Spiele über PSNP+.",
+  "Requires the classic platform filters in PSNP+.": "Benötigt die klassischen Plattformfilter von PSNP+.",
+  "Welcome to Trophy Hub": "Willkommen bei Trophy Hub",
+  "Your personal trophy dashboard": "Dein persönliches Trophäen-Dashboard",
+  "Trophy Hub adds a customizable sidebar and useful features to PSNProfiles. It also works alongside PSNP+.": "Trophy Hub ergänzt PSNProfiles um eine anpassbare Seitenleiste und praktische Funktionen. Es funktioniert auch zusammen mit PSNP+.",
+  "Your sidebar": "Deine Seitenleiste",
+  "Open or collapse the sidebar with its arrow. Rearrange sections, use quick filters and open settings or colors from the header.": "Klappe die Seitenleiste mit dem Pfeil ein oder aus. Sortiere Bereiche, nutze Schnellfilter und öffne Einstellungen oder Farben über die Kopfleiste.",
+  "Arrange your profile": "Gestalte dein Profil",
+  "Use the edit button in the profile navigation to move, resize or hide profile sections. Restore the original arrangement whenever you like.": "Mit dem Bearbeitungssymbol in der Profilnavigation kannst du Profilbereiche verschieben, vergrößern oder ausblenden. Die ursprüngliche Anordnung lässt sich jederzeit wiederherstellen.",
+  "Notes, favorites and settings": "Notizen, Favoriten und Einstellungen",
+  "Save game and profile notes, favorite players and links locally. Adjust appearance and position in settings, and export a backup when needed.": "Speichere Spiel- und Profilnotizen, Spielerfavoriten und Links lokal. Passe Darstellung und Position in den Einstellungen an und exportiere bei Bedarf ein Backup.",
+  "Get started": "Los geht’s",
+  "Next": "Weiter"
 };
