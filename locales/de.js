@@ -369,5 +369,6 @@ var __trophyDeckLocale_de = {
   "Pin games in your profile": "Spiele im eigenen Profil anheften",
   "Pin games to the top of your own game list.": "Heftet Spiele an den Anfang deiner eigenen Spieleliste.",
   "Pin game": "Spiel anheften",
-  "Unpin game": "Spiel lösen"
+  "Unpin game": "Spiel lösen",
+  "Pinned games": "Angeheftete Spiele"
 };

@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.48
+// @version      1.0.49
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.48";
+const APP_VERSION = "1.0.49";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -2494,7 +2494,8 @@ function isOwnGameProfile(profile) {
 }
 
 function placeGameControls(cell) {
-    const line = cell.querySelector('.ellipsis');
+    const title = cell.querySelector('a.title[href*="/trophies/"]');
+    const line = title?.closest('span') || cell.querySelector('.ellipsis');
     if (!line) return;
     const pin = cell.querySelector('.td-game-pin');
     const star = cell.querySelector('.td-cabinet-add');
@@ -2538,6 +2539,7 @@ function createGamePinButton(id, profile) {
         const index = saved.indexOf(id);
         if (index >= 0) saved.splice(index, 1); else saved.push(id);
         localStorage.setItem(key, JSON.stringify(saved));
+        if (index >= 0) localStorage.removeItem(pinnedCacheKey(profile, id));
         logEvent(index >= 0 ? 'game.unpin' : 'game.pin');
         updatePinnedGames();
     });
@@ -2549,6 +2551,7 @@ function updatePinnedGames() {
     const own = isOwnGameProfile(profile);
     const active = own && enabled('trophydeck.pinGames');
     const saved = active ? readList(pinnedGamesKey(profile)).filter(id => typeof id === 'string') : [];
+    if (active) restoreCachedPinnedRows(profile, saved);
     const groups = new Map();
     document.querySelectorAll('tr td a.title[href*="/trophies/"]').forEach(link => {
         const row = link.closest('tr');
@@ -2565,7 +2568,9 @@ function updatePinnedGames() {
         }
         if (!active && button) { button.remove(); button = null; }
         const pinned = active && saved.includes(id);
+        if (row.dataset.tdPinnedCache && !pinned) { row.remove(); return; }
         row.classList.toggle('td-pinned-game', pinned);
+        if (pinned && !row.dataset.tdPinnedCache) savePinnedRow(profile, id, row);
         if (button) {
             button.dataset.pinned = String(pinned);
             button.title = pinned ? t('Unpin game') : t('Pin game');
@@ -2588,7 +2593,10 @@ function updatePinnedGames() {
     for (const [parent, items] of groups) {
         items.sort((a, b) => saved.indexOf(a.id) - saved.indexOf(b.id));
         const firstRows = Array.from(parent.children).filter(row => row.matches('tr') && row.querySelector('a.title[href*="/trophies/"]'));
-        if (items.every((item, index) => firstRows[index] === item.row)) continue;
+        if (items.every((item, index) => firstRows[index] === item.row)) {
+            updatePinnedHeader(parent, items[0].row);
+            continue;
+        }
         for (const {row} of items) {
             if (!pinnedGameMarkers.has(row)) {
                 const marker = document.createComment('trophyhub-pin');
@@ -2601,7 +2609,90 @@ function updatePinnedGames() {
             if (row !== before) parent.insertBefore(row, before);
             before = row.nextElementSibling;
         }
+        updatePinnedHeader(parent, items[0].row);
     }
+    document.querySelectorAll('[data-td-pinned-header]').forEach(header => {
+        const body = header.parentElement?.tBodies?.[0];
+        if (!body || !groups.has(body)) header.remove();
+    });
+}
+
+function pinnedCacheKey(profile, id) {
+    return 'trophydeck.pinnedGameCache.' + profile.path.toLowerCase() + '.' + id;
+}
+
+// Only keep inert page content. Never persist our controls or executable HTML.
+function cleanPinnedRow(row) {
+    const clone = row.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.removeAttribute('style');
+    clone.classList.remove('td-pinned-game');
+    clone.querySelectorAll('script, style, iframe, object, embed, form, input, button, .trophydeck-game-note, .td-cabinet-add, .td-game-pin').forEach(element => element.remove());
+    [clone, ...clone.querySelectorAll('*')].forEach(element => {
+        for (const attribute of Array.from(element.attributes)) {
+            const name = attribute.name.toLowerCase();
+            if (name === 'id' || name === 'srcdoc' || name.startsWith('on')) element.removeAttribute(attribute.name);
+            if (['href', 'src'].includes(name) && /^\s*(?:javascript|data|vbscript):/i.test(attribute.value)) element.removeAttribute(attribute.name);
+        }
+    });
+    return clone;
+}
+
+function savePinnedRow(profile, id, row) {
+    const clean = cleanPinnedRow(row);
+    const value = JSON.stringify({version:1, html:clean.outerHTML});
+    const key = pinnedCacheKey(profile, id);
+    try {
+        if (localStorage.getItem(key) !== value) localStorage.setItem(key, value);
+    } catch (_) {
+        // Storage may be full. The live row remains usable.
+    }
+}
+
+function restoreCachedPinnedRows(profile, saved) {
+    // A cached row cannot reliably reproduce a server-side filtered result.
+    if (location.search) return;
+    const table = document.querySelector('#gamesTable');
+    const parent = table?.tBodies[0];
+    if (!parent) return;
+    const existing = new Map();
+    parent.querySelectorAll('tr td a.title[href*="/trophies/"]').forEach(link => {
+        const id = new URL(link.href, location.href).pathname.match(/^\/trophies\/(\d+)/)?.[1];
+        const row = link.closest('tr');
+        if (!id || !row) return;
+        const previous = existing.get(id);
+        if (previous && previous.dataset.tdPinnedCache && !row.dataset.tdPinnedCache) previous.remove();
+        else if (previous && !previous.dataset.tdPinnedCache && row.dataset.tdPinnedCache) { row.remove(); return; }
+        existing.set(id, row);
+    });
+    saved.forEach(id => {
+        if (existing.has(id)) return;
+        try {
+            const cached = JSON.parse(localStorage.getItem(pinnedCacheKey(profile, id)) || 'null');
+            if (!cached || cached.version !== 1 || typeof cached.html !== 'string' || cached.html.length > 100000) return;
+            const template = document.createElement('template');
+            template.innerHTML = cached.html;
+            const candidate = template.content.firstElementChild;
+            if (!candidate || candidate.tagName !== 'TR') return;
+            const row = cleanPinnedRow(candidate);
+            const link = row.querySelector('a.title[href*="/trophies/"]');
+            const url = link && new URL(link.href, location.href);
+            const match = url?.pathname.match(/^\/trophies\/(\d+)(?:-[^/]*)?\/([^/]+)\/?$/);
+            if (!match || url.origin !== location.origin || match[1] !== id || ('/' + match[2]).toLowerCase() !== profile.path.toLowerCase()) return;
+            row.dataset.tdPinnedCache = id;
+            parent.insertBefore(row, parent.firstChild);
+        } catch (_) {
+            // A damaged or incompatible cache is ignored; the live row can refill it.
+        }
+    });
+}
+
+function updatePinnedHeader(parent) {
+    const table = parent.closest('table');
+    if (!table || table.querySelector('[data-td-pinned-header]')) return;
+    const header = make('caption', t('Pinned games'));
+    header.dataset.tdPinnedHeader = 'true';
+    table.insertBefore(header, table.firstChild);
 }
 
 
@@ -4059,11 +4150,7 @@ html.td-hide-psnp-version #header .logo > a[data-td-psnp-version] { display:none
 #trophydeck-rail .td-classic-status { display:block; color:#c7d6e4; font-size:11px; line-height:1.4; }
 #trophydeck-rail .td-classic-status:not(:empty) { margin-top:6px; }
 
-/* Empty game notes occupy space only while their row is targeted. */
-.trophydeck-game-note.td-list-game-note.td-note-empty { display:none; }
-tr:hover .trophydeck-game-note.td-list-game-note.td-note-empty,
-tr:focus-within .trophydeck-game-note.td-list-game-note.td-note-empty { display:flex; }
-@media (hover:none) { .trophydeck-game-note.td-list-game-note.td-note-empty { display:flex; } }
+/* Game note placeholders keep the row height stable on hover. */
 .td-game-pin { display:inline-flex; align-items:center; justify-content:center; vertical-align:middle; width:20px; height:20px; padding:2px; border:0; background:transparent; color:var(--td-accent); cursor:pointer; }
 .td-game-pin svg { display:block; width:16px; height:16px; }
 .td-game-pin[data-pinned="true"] { opacity:1 !important; }
@@ -4071,6 +4158,8 @@ tr:focus-within .trophydeck-game-note.td-list-game-note.td-note-empty { display:
  .td-game-pin:not([data-pinned="true"]) { opacity:0; pointer-events:none; }
  tr:hover .td-game-pin, tr:focus-within .td-game-pin { opacity:1; pointer-events:auto; }
 }
+
+caption[data-td-pinned-header] { caption-side:top; text-align:left; padding:7px 10px; color:#fff; background:var(--td-accent,#315c89); font-weight:bold; text-transform:uppercase; font-size:12px; }
 `;
     document.head.append(style);
 

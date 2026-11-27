@@ -369,5 +369,6 @@ var __trophyDeckLocale_en = {
   "Pin games in your profile": "Pin games in your profile",
   "Pin games to the top of your own game list.": "Pin games to the top of your own game list.",
   "Pin game": "Pin game",
-  "Unpin game": "Unpin game"
+  "Unpin game": "Unpin game",
+  "Pinned games": "Pinned games"
 };
