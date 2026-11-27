@@ -389,5 +389,6 @@ var __trophyDeckLocale_en = {
   "Game database export preview": "Game database export preview",
   "Export game data": "Export game data",
   "Delete collected game data": "Delete collected game data",
-  "Delete all locally collected game data? Notes and other settings will remain.": "Delete all locally collected game data? Notes and other settings will remain."
+  "Delete all locally collected game data? Notes and other settings will remain.": "Delete all locally collected game data? Notes and other settings will remain.",
+  "Game data": "Game data"
 };

@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.58
+// @version      1.0.59
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.58";
+const APP_VERSION = "1.0.59";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -61,7 +61,6 @@ const features = [
     { key: 'trophydeck.cabinetNames', label: t("Show game names in cabinet"), defaultValue: false },
     { key: 'trophydeck.scrollButtons', label: t("Show scroll-to-bottom button"), defaultValue: true },
     { key: 'trophydeck.globalNote', label: t("Global note in the deck"), defaultValue: true },
-    { key: 'trophydeck.collectGameCatalog', label: t('Collect game data'), defaultValue: false },
     { key: 'trophydeck.pinGames', label: t('Pin games on profile pages'), defaultValue: true },
     { key: 'trophydeck.gameNotes', label: t("Show notes below games"), defaultValue: true },
     { key: 'trophydeck.stickyNav', label: t("Keep profile navigation visible when scrolling"), defaultValue: true },
@@ -190,10 +189,6 @@ function toggleControl(feature) {
             updateGameCabinet();
             updatePinnedGames();
             setupScrollControls();
-            if (feature.key === 'trophydeck.collectGameCatalog') {
-                if (input.checked) collectGameCatalog();
-                updateCatalogSettings();
-            }
             document.querySelectorAll('[data-epic-toggle]').forEach(other => {
                     if (other.dataset.epicToggle === feature.key) {
                         other.checked = input.checked;
@@ -203,7 +198,7 @@ function toggleControl(feature) {
     input.dataset.epicToggle = feature.key;
     const copy=make('span');
     copy.append(make('span',feature.label));
-    const descriptions={collectGameCatalog:t('Collects public trophy list details from pages you visit. Data stays in this browser until you export it.'),pinGames:t('Pin games to the top of any profile game list.'),hidePsnpVersion:t('Hides the PSNP+ version below the site logo.'),showAccountLinks:t('Links to your own profile and account pages.'),hideFlaggedBox:t("Hides the leaderboard notice on profile pages."),showRail:t("Shows Trophy Deck as a collapsible sidebar."),showStats:t("Calculates additional profile statistics."),showLinks:t("Provides preset views of the game list."),showNote:t("A note for the profile currently displayed."),globalNote:t("The same note on every page."),favorites:t("Saves profile links as favorites."),cabinet:t("Use the star in the profile game list to save games to the cabinet."),cabinetNames:t("Shows shortened game names below covers."),scrollButtons:t("Adds a scroll-to-bottom button next to the scroll-to-top button."),customLinks:t("Manage your own links and categories."),gameNotes:t("Shows the same game note across profiles on this browser."),noteWrap:t("Displays long game notes over multiple lines."),stickyNav:t("Keeps the profile navigation with Profile, Trophy Log and Stats visible while scrolling."),psnpColors:t("Applies the selected theme to page headers and dialogs."),analytics:t("Counts selected actions locally; nothing is sent automatically.")};
+    const descriptions={pinGames:t('Pin games to the top of any profile game list.'),hidePsnpVersion:t('Hides the PSNP+ version below the site logo.'),showAccountLinks:t('Links to your own profile and account pages.'),hideFlaggedBox:t("Hides the leaderboard notice on profile pages."),showRail:t("Shows Trophy Deck as a collapsible sidebar."),showStats:t("Calculates additional profile statistics."),showLinks:t("Provides preset views of the game list."),showNote:t("A note for the profile currently displayed."),globalNote:t("The same note on every page."),favorites:t("Saves profile links as favorites."),cabinet:t("Use the star in the profile game list to save games to the cabinet."),cabinetNames:t("Shows shortened game names below covers."),scrollButtons:t("Adds a scroll-to-bottom button next to the scroll-to-top button."),customLinks:t("Manage your own links and categories."),gameNotes:t("Shows the same game note across profiles on this browser."),noteWrap:t("Displays long game notes over multiple lines."),stickyNav:t("Keeps the profile navigation with Profile, Trophy Log and Stats visible while scrolling."),psnpColors:t("Applies the selected theme to page headers and dialogs."),analytics:t("Counts selected actions locally; nothing is sent automatically.")};
     const desc=descriptions[feature.key.replace('trophydeck.','')];
     if(desc){
         copy.append(make('small',desc,'td-setting-description'));
@@ -387,7 +382,6 @@ function openSettings() {
         ['deck', 'Trophy Deck', ['showRail']],
         ['blocks', "Deck sections", ['showAccountLinks', 'showStats', 'showLinks', 'showNote', 'globalNote', 'customLinks', 'favorites', 'cabinet', 'cabinetNames']],
         ['notes', "Game notes", ['gameNotes', 'noteWrap']],
-        ['catalog', 'Game database', ['collectGameCatalog']],
         ['colors', "Colors", ['psnpColors']],
         ['analytics', "Usage statistics", ['analytics']],
         ['backup', 'Backup', []],
@@ -551,15 +545,6 @@ function openSettings() {
             localStorage.removeItem('trophydeck.usage');
         });
     statsActions.append(clearUsage);
-    const catalogStats = make('p', '', 'epic-muted');
-    catalogStats.dataset.tdCatalogStats = 'true';
-    const catalogPreview = make('details', null, 'td-catalog-preview');
-    catalogPreview.append(make('summary', t('Preview export')));
-    const catalogText = make('textarea');
-    catalogText.readOnly = true;
-    catalogText.setAttribute('aria-label', t('Game database export preview'));
-    catalogText.dataset.tdCatalogPreview = 'true';
-    catalogPreview.append(catalogText);
     const catalogActions = make('div', null, 'td-setting-actions');
     const catalogExport = make('button', t('Export game data'), 'epic-button');
     catalogExport.type = 'button';
@@ -569,10 +554,9 @@ function openSettings() {
     catalogDelete.addEventListener('click', async () => {
         if (!await tdDialog(t('Delete collected game data'), [], t('Delete all locally collected game data? Notes and other settings will remain.'))) return;
         localStorage.removeItem(GAME_CATALOG_KEY);
-        updateCatalogSettings();
     });
     catalogActions.append(catalogExport, catalogDelete);
-    sections.catalog.append(catalogStats, catalogPreview, catalogActions);
+    sections.analytics.append(make('h3', t('Game data')), catalogActions);
 
     const exportAll=make('button',t("Download backup"),'epic-button');
     exportAll.type='button';
@@ -799,7 +783,6 @@ function openSettings() {
     dialog.addEventListener('close', () => dialog.remove());
     document.body.append(dialog);
     prepareDialog(dialog);
-    updateCatalogSettings();
     dialog.showModal();
 }
 
@@ -3368,11 +3351,11 @@ function catalogRegion(text) {
     return GAME_CATALOG_REGIONS[value.toLowerCase()] || (GAME_CATALOG_CODES.has(value.toUpperCase()) ? value.toUpperCase() : null);
 }
 
-function catalogListLink(href) {
+function catalogListLink(href, allowProfile = false) {
     try {
         const url = new URL(href, location.href);
         if (url.origin !== 'https://psnprofiles.com') return null;
-        const match = url.pathname.match(/^\/trophies\/(\d+)-([^/]+)\/?$/);
+        const match = url.pathname.match(allowProfile ? /^\/trophies\/(\d+)-([^/]+)(?:\/[^/]+)?\/?$/ : /^\/trophies\/(\d+)-([^/]+)\/?$/);
         if (!match || !Number.isSafeInteger(Number(match[1]))) return null;
         return {id:Number(match[1]), slug:match[2]};
     } catch (_) { return null; }
@@ -3430,6 +3413,31 @@ function parseCatalogPage() {
     return records;
 }
 
+// Profile list links can end in a PSN name. Only ID and slug are retained.
+function catalogProfileRegion(link) {
+    let suffix = '';
+    for (let node = link.nextSibling; node; node = node.nextSibling) {
+        if (node.nodeType === 1 && (node.matches('button, a, i, svg') || node.classList.contains('td-game-pin') || node.classList.contains('td-cabinet-add'))) break;
+        suffix += node.textContent || '';
+        if (suffix.length > 100) break;
+    }
+    const match = suffix.match(/^\s*[•·]\s*([A-Z]{2,3})(?=\s|$|[•·])/);
+    return match ? catalogRegion(match[1]) : null;
+}
+
+function parseCatalogGameLists() {
+    const records = [];
+    document.querySelectorAll('#gamesTable tr a.title[href*="/trophies/"], #search-results tr a.title[href*="/trophies/"]').forEach(link => {
+        const row = link.closest('tr');
+        if (!row || row.dataset.tdPinnedCache) return;
+        const current = catalogListLink(link.href, true);
+        const name = link.textContent.trim();
+        if (!current || !name) return;
+        records.push({...current, name, p:catalogPlatforms(row), r:catalogProfileRegion(link), detail:false, links:[]});
+    });
+    return records;
+}
+
 function mergeCatalogRecords(catalog, records) {
     for (const incoming of records) {
         const key = String(incoming.id);
@@ -3452,9 +3460,9 @@ function mergeCatalogRecords(catalog, records) {
 }
 
 function collectGameCatalog() {
-    if (!enabled('trophydeck.collectGameCatalog')) return false;
-    const records = parseCatalogPage();
-    if (!records) return false;
+    const pageRecords = parseCatalogPage();
+    const records = [...(pageRecords || []), ...parseCatalogGameLists()];
+    if (!records.length) return false;
     const catalog = readGameCatalog();
     if (!catalog) return false;
     catalog.version = 1;
@@ -3462,10 +3470,8 @@ function collectGameCatalog() {
     try {
         const value = JSON.stringify(catalog);
         if (localStorage.getItem(GAME_CATALOG_KEY) !== value) localStorage.setItem(GAME_CATALOG_KEY, value);
-        updateCatalogSettings();
         return true;
     } catch (_) {
-        updateCatalogSettings(t('Could not save game data. Browser storage may be full.'));
         return false;
     }
 }
@@ -3512,14 +3518,6 @@ function downloadGameCatalog() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function updateCatalogSettings(message = '') {
-    const stats = document.querySelector('[data-td-catalog-stats]');
-    if (!stats) return;
-    const catalog = readGameCatalog();
-    stats.textContent = message || (catalog ? Object.keys(catalog.records).length + t(' trophy lists saved locally.') : t('Saved game data could not be read.'));
-    const preview = document.querySelector('[data-td-catalog-preview]');
-    if (preview) preview.value = gameCatalogJson() || '';
-}
 
 
 const quickSettingGroups = [
@@ -3788,6 +3786,7 @@ function observePageChanges() {
         if (gameAdded) {
             updateGameCabinet();
             updatePinnedGames();
+            collectGameCatalog();
         }
     });
     cabinetObserver.observe(document.body, {childList:true, subtree:true});
@@ -4506,9 +4505,6 @@ caption[data-td-pinned-header] { caption-side:top; text-align:left; padding:7px 
 #content > .td-unified-grid > [data-td-profile-section="milestones"],
 #content > .td-unified-grid > [data-td-profile-section="rarest"] { padding-bottom:10px; }
 
-#trophydeck-settings .td-catalog-preview { margin:12px 0; }
-#trophydeck-settings .td-catalog-preview summary { cursor:pointer; font-weight:bold; }
-#trophydeck-settings .td-catalog-preview textarea { display:block; box-sizing:border-box; width:100%; min-height:180px; margin-top:8px; padding:8px; resize:vertical; background:color-mix(in srgb,white 92%,var(--td-accent)); color:#222; font:12px/1.4 monospace; }
 `;
     document.head.append(style);
 

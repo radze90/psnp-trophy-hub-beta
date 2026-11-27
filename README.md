@@ -12,4 +12,4 @@ Bei Chrome und anderen Chromium-basierten Browsern muss gegebenenfalls **„Nutz
 
 ## Datenschutz
 
-Einstellungen, Notizen, Links, Favoriten und Nutzungsstatistiken werden lokal in deinem Browser gespeichert. Trophy Hub sendet sie nicht automatisch an Dritte. Nutzungsstatistiken kannst du bei Bedarf selbst exportieren und weitergeben. Beim Installieren und Aktualisieren werden das Userscript und die Sprachdateien von GitHub geladen. Selbst hinzugefügte Links öffnen ihr jeweiliges Ziel erst beim Anklicken.
+Einstellungen, Notizen, Links, Favoriten, Nutzungsstatistiken und öffentliche Spieldaten besuchter PSNProfiles-Seiten werden lokal in deinem Browser gespeichert. Trophy Hub sendet sie nicht automatisch an Dritte. Nutzungsstatistiken kannst du bei Bedarf selbst exportieren und weitergeben. Beim Installieren und Aktualisieren werden das Userscript und die Sprachdateien von GitHub geladen. Selbst hinzugefügte Links öffnen ihr jeweiliges Ziel erst beim Anklicken.

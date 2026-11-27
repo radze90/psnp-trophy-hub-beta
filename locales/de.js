@@ -389,5 +389,6 @@ var __trophyDeckLocale_de = {
   "Game database export preview": "Vorschau des Spieldaten-Exports",
   "Export game data": "Spieldaten exportieren",
   "Delete collected game data": "Gesammelte Spieldaten löschen",
-  "Delete all locally collected game data? Notes and other settings will remain.": "Alle lokal gesammelten Spieldaten löschen? Notizen und andere Einstellungen bleiben erhalten."
+  "Delete all locally collected game data? Notes and other settings will remain.": "Alle lokal gesammelten Spieldaten löschen? Notizen und andere Einstellungen bleiben erhalten.",
+  "Game data": "Spieldaten"
 };
