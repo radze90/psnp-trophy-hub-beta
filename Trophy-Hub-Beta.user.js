@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.56
+// @version      1.0.57
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.56";
+const APP_VERSION = "1.0.57";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -4297,6 +4297,10 @@ caption[data-td-pinned-header] { caption-side:top; text-align:left; padding:7px 
 #trophydeck-rail.td-initializing, #trophydeck-rail.td-initializing .epic-panel { transition:none !important; }
 #trophydeck-settings .td-clear-pins-description { display:block; margin-top:16px; }
 #trophydeck-settings .td-clear-all-pins { margin-top:8px; }
+
+/* These two site sections have no native bottom margin, unlike the cabinet. */
+#content > .td-unified-grid > [data-td-profile-section="milestones"],
+#content > .td-unified-grid > [data-td-profile-section="rarest"] { padding-bottom:10px; }
 `;
     document.head.append(style);
 
