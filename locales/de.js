@@ -365,5 +365,9 @@ var __trophyDeckLocale_de = {
   "Loading all games through PSNP+. Please keep this page open.": "Alle Spiele werden über PSNP+ geladen. Bitte lass diese Seite geöffnet.",
   "Loading did not finish. Please try again or use the PSNP+ load button.": "Das Laden wurde nicht abgeschlossen. Bitte versuche es erneut oder nutze den Ladebutton von PSNP+.",
   "Please load all games with PSNP+ before applying this filter.": "Bitte lade vor dem Filtern alle Spiele über PSNP+.",
-  "The PSNP+ platform filter is no longer available.": "Der Plattformfilter von PSNP+ ist nicht mehr verfügbar."
+  "The PSNP+ platform filter is no longer available.": "Der Plattformfilter von PSNP+ ist nicht mehr verfügbar.",
+  "Pin games in your profile": "Spiele im eigenen Profil anheften",
+  "Pin games to the top of your own game list.": "Heftet Spiele an den Anfang deiner eigenen Spieleliste.",
+  "Pin game": "Spiel anheften",
+  "Unpin game": "Spiel lösen"
 };

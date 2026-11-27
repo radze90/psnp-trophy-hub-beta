@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.47
+// @version      1.0.48
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.47";
+const APP_VERSION = "1.0.48";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -61,6 +61,7 @@ const features = [
     { key: 'trophydeck.cabinetNames', label: t("Show game names in cabinet"), defaultValue: false },
     { key: 'trophydeck.scrollButtons', label: t("Show scroll-to-bottom button"), defaultValue: true },
     { key: 'trophydeck.globalNote', label: t("Global note in the deck"), defaultValue: true },
+    { key: 'trophydeck.pinGames', label: t('Pin games in your profile'), defaultValue: true },
     { key: 'trophydeck.gameNotes', label: t("Show notes below games"), defaultValue: true },
     { key: 'trophydeck.stickyNav', label: t("Keep profile navigation visible when scrolling"), defaultValue: true },
     { key: 'trophydeck.customLinks', label: t("Custom links in the deck"), defaultValue: true },
@@ -186,6 +187,7 @@ function toggleControl(feature) {
             updateGameNotes(true);
             updateStickyNav();
             updateGameCabinet();
+            updatePinnedGames();
             setupScrollControls();
             document.querySelectorAll('[data-epic-toggle]').forEach(other => {
                     if (other.dataset.epicToggle === feature.key) {
@@ -196,7 +198,7 @@ function toggleControl(feature) {
     input.dataset.epicToggle = feature.key;
     const copy=make('span');
     copy.append(make('span',feature.label));
-    const descriptions={hidePsnpVersion:t('Hides the PSNP+ version below the site logo.'),showAccountLinks:t('Links to your own profile and account pages.'),hideFlaggedBox:t("Hides the leaderboard notice on profile pages."),showRail:t("Shows Trophy Deck as a collapsible sidebar."),showStats:t("Calculates additional profile statistics."),showLinks:t("Provides preset views of the game list."),showNote:t("A note for the profile currently displayed."),globalNote:t("The same note on every page."),favorites:t("Saves profile links as favorites."),cabinet:t("Use the star in the profile game list to save games to the cabinet."),cabinetNames:t("Shows shortened game names below covers."),scrollButtons:t("Adds a scroll-to-bottom button next to the scroll-to-top button."),customLinks:t("Manage your own links and categories."),gameNotes:t("Shows the same game note across profiles on this browser."),noteWrap:t("Displays long game notes over multiple lines."),stickyNav:t("Keeps the profile navigation with Profile, Trophy Log and Stats visible while scrolling."),psnpColors:t("Applies the selected theme to page headers and dialogs."),analytics:t("Counts selected actions locally; nothing is sent automatically.")};
+    const descriptions={pinGames:t('Pin games to the top of your own game list.'),hidePsnpVersion:t('Hides the PSNP+ version below the site logo.'),showAccountLinks:t('Links to your own profile and account pages.'),hideFlaggedBox:t("Hides the leaderboard notice on profile pages."),showRail:t("Shows Trophy Deck as a collapsible sidebar."),showStats:t("Calculates additional profile statistics."),showLinks:t("Provides preset views of the game list."),showNote:t("A note for the profile currently displayed."),globalNote:t("The same note on every page."),favorites:t("Saves profile links as favorites."),cabinet:t("Use the star in the profile game list to save games to the cabinet."),cabinetNames:t("Shows shortened game names below covers."),scrollButtons:t("Adds a scroll-to-bottom button next to the scroll-to-top button."),customLinks:t("Manage your own links and categories."),gameNotes:t("Shows the same game note across profiles on this browser."),noteWrap:t("Displays long game notes over multiple lines."),stickyNav:t("Keeps the profile navigation with Profile, Trophy Log and Stats visible while scrolling."),psnpColors:t("Applies the selected theme to page headers and dialogs."),analytics:t("Counts selected actions locally; nothing is sent automatically.")};
     const desc=descriptions[feature.key.replace('trophydeck.','')];
     if(desc){
         copy.append(make('small',desc,'td-setting-description'));
@@ -376,7 +378,7 @@ function openSettings() {
     // IDs remain stable when the display language changes.
     const categories = [
         ['language', 'Language', []],
-        ['profile', "Profile page", ['stickyNav', 'hideFlaggedBox', 'scrollButtons', 'hidePsnpVersion']],
+        ['profile', "Profile page", ['stickyNav', 'hideFlaggedBox', 'scrollButtons', 'hidePsnpVersion', 'pinGames']],
         ['deck', 'Trophy Deck', ['showRail']],
         ['blocks', "Deck sections", ['showAccountLinks', 'showStats', 'showLinks', 'showNote', 'globalNote', 'customLinks', 'favorites', 'cabinet', 'cabinetNames']],
         ['notes', "Game notes", ['gameNotes', 'noteWrap']],
@@ -1550,6 +1552,7 @@ function noteWidget(key, label, placeholder) {
     function display() {
         preview.replaceChildren();
         const text=editor.value;
+        if (isGameNote) wrap.classList.toggle('td-note-empty', !text.trim());
         if(!text) {
             preview.textContent=placeholder;
             preview.classList.add('td-note-placeholder');
@@ -1636,6 +1639,7 @@ function updateGameNotes(refresh = false) {
                 localStorage.setItem(GLOBAL_GAME_INFO_PREFIX+m[1],JSON.stringify({name:link.textContent.trim(),href:url.pathname}));
                 const wrap=noteWidget(GLOBAL_GAME_NOTE_PREFIX+m[1],t("Note for ")+link.textContent.trim(),t("+ Game note"));
                 wrap.dataset.gameNote='true';
+                wrap.classList.add('td-list-game-note');
                 const infos=cell.querySelectorAll('.small-info');
                 if(infos.length){
                     infos[infos.length-1].after(wrap);
@@ -2194,6 +2198,7 @@ function updateGameCabinet() {
                 existing.textContent=saved?'★':'☆';
                 existing.dataset.saved=String(saved);
                 existing.setAttribute('aria-label',saved?t("Remove from game cabinet"):t("Add to game cabinet"));
+                placeGameControls(cell);
                 return;
             }
             const add=make('button','☆','td-cabinet-add td-edit-control');
@@ -2218,6 +2223,7 @@ function updateGameCabinet() {
                     renderCabinet();
                 });
             link.parentElement.append(' ',add);
+            placeGameControls(cell);
             sync();
         });
     function renderCabinet() {
@@ -2467,6 +2473,135 @@ function enableRailDragging(header) {
             header.addEventListener('pointerup',stop);
             header.addEventListener('pointercancel',stop);
         });
+}
+
+
+// Pins are local to the signed-in profile. The original rows stay in the
+// site's table, so PSNProfiles and PSNP+ can still filter them normally.
+const pinnedGameMarkers = new WeakMap();
+
+function isOwnGameProfile(profile) {
+    if (!profile || location.pathname.replace(/\/$/, '').toLowerCase() !== profile.path.toLowerCase()) return false;
+    const menu = document.querySelector('div.user-menu > div.dropdown.user-nav');
+    const identity = menu?.querySelector('a.dropdown-toggle[href]');
+    if (!identity) return false;
+    try {
+        const url = new URL(identity.href, location.href);
+        return url.origin === location.origin && url.pathname.replace(/\/$/, '').toLowerCase() === profile.path.toLowerCase();
+    } catch (_) {
+        return false;
+    }
+}
+
+function placeGameControls(cell) {
+    const line = cell.querySelector('.ellipsis');
+    if (!line) return;
+    const pin = cell.querySelector('.td-game-pin');
+    const star = cell.querySelector('.td-cabinet-add');
+    // Place controls after site/PSNP+ icons, with the cabinet star last.
+    if (star && (star.parentElement !== line || line.lastElementChild !== star)) line.append(star);
+    if (pin && (pin.parentElement !== line || (star && pin.nextElementSibling !== star) || (!star && line.lastElementChild !== pin))) {
+        line.insertBefore(pin, star?.parentElement === line ? star : null);
+    }
+}
+
+function placeAllGameControls() {
+    document.querySelectorAll('tr td a.title[href*="/trophies/"]').forEach(link => {
+        const cell = link.closest('td');
+        if (cell && (cell.querySelector('.td-game-pin') || cell.querySelector('.td-cabinet-add'))) placeGameControls(cell);
+    });
+}
+
+function pinnedGamesKey(profile) {
+    return 'trophydeck.pinnedGames.' + profile.path.toLowerCase();
+}
+
+function createGamePinButton(id, profile) {
+    const button = make('button', null, 'td-game-pin');
+    button.type = 'button';
+    button.dataset.tdGamePin = id;
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icon.setAttribute('viewBox', '0 0 24 24');
+    icon.setAttribute('aria-hidden', 'true');
+    icon.setAttribute('fill', 'none');
+    icon.setAttribute('stroke', 'currentColor');
+    icon.setAttribute('stroke-width', '2');
+    icon.setAttribute('stroke-linecap', 'round');
+    icon.setAttribute('stroke-linejoin', 'round');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M16 3l5 5-3 1-3 4 1 3-1 1-4-4-6 6-1 1 1-1 6-6-4-4 1-1 3 1 4-3 1-3z');
+    icon.append(path);
+    button.append(icon);
+    button.addEventListener('click', () => {
+        const key = pinnedGamesKey(profile);
+        const saved = readList(key).filter(value => typeof value === 'string');
+        const index = saved.indexOf(id);
+        if (index >= 0) saved.splice(index, 1); else saved.push(id);
+        localStorage.setItem(key, JSON.stringify(saved));
+        logEvent(index >= 0 ? 'game.unpin' : 'game.pin');
+        updatePinnedGames();
+    });
+    return button;
+}
+
+function updatePinnedGames() {
+    const profile = profileInfo();
+    const own = isOwnGameProfile(profile);
+    const active = own && enabled('trophydeck.pinGames');
+    const saved = active ? readList(pinnedGamesKey(profile)).filter(id => typeof id === 'string') : [];
+    const groups = new Map();
+    document.querySelectorAll('tr td a.title[href*="/trophies/"]').forEach(link => {
+        const row = link.closest('tr');
+        const cell = link.closest('td');
+        if (!row || !cell || !row.parentElement) return;
+        const url = new URL(link.href, location.href);
+        const match = url.pathname.match(/^\/trophies\/(\d+)(?:-[^/]*)?\/([^/]+)\/?$/);
+        if (url.origin !== location.origin || !match || !profile || ('/' + match[2]).toLowerCase() !== profile.path.toLowerCase()) return;
+        const id = match[1];
+        let button = cell.querySelector('.td-game-pin');
+        if (active && !button) {
+            button = createGamePinButton(id, profile);
+            link.parentElement.append(button);
+        }
+        if (!active && button) { button.remove(); button = null; }
+        const pinned = active && saved.includes(id);
+        row.classList.toggle('td-pinned-game', pinned);
+        if (button) {
+            button.dataset.pinned = String(pinned);
+            button.title = pinned ? t('Unpin game') : t('Pin game');
+            button.setAttribute('aria-label', button.title + ': ' + link.textContent.trim());
+            button.setAttribute('aria-pressed', String(pinned));
+            placeGameControls(cell);
+        }
+        const marker = pinnedGameMarkers.get(row);
+        if (!pinned && marker) {
+            if (marker.parentNode) marker.parentNode.insertBefore(row, marker);
+            marker.remove();
+            pinnedGameMarkers.delete(row);
+        }
+        if (pinned) {
+            const parent = row.parentElement;
+            if (!groups.has(parent)) groups.set(parent, []);
+            groups.get(parent).push({row, id});
+        }
+    });
+    for (const [parent, items] of groups) {
+        items.sort((a, b) => saved.indexOf(a.id) - saved.indexOf(b.id));
+        const firstRows = Array.from(parent.children).filter(row => row.matches('tr') && row.querySelector('a.title[href*="/trophies/"]'));
+        if (items.every((item, index) => firstRows[index] === item.row)) continue;
+        for (const {row} of items) {
+            if (!pinnedGameMarkers.has(row)) {
+                const marker = document.createComment('trophyhub-pin');
+                row.before(marker);
+                pinnedGameMarkers.set(row, marker);
+            }
+        }
+        let before = firstRows[0] || null;
+        for (const {row} of items) {
+            if (row !== before) parent.insertBefore(row, before);
+            before = row.nextElementSibling;
+        }
+    }
 }
 
 
@@ -2979,7 +3114,7 @@ function setupProfileLayoutEditor() {
 
 
 const quickSettingGroups = [
-    ['profile', 'Profile page', ['hideFlaggedBox', 'stickyNav', 'scrollButtons', 'cabinet', 'cabinetNames', 'hidePsnpVersion']],
+    ['profile', 'Profile page', ['hideFlaggedBox', 'stickyNav', 'scrollButtons', 'cabinet', 'cabinetNames', 'hidePsnpVersion', 'pinGames']],
     ['deck', 'Deck sections', ['showAccountLinks', 'showStats', 'showLinks', 'showNote', 'globalNote', 'customLinks', 'favorites']],
     ['notes', 'Game notes', ['gameNotes', 'noteWrap']],
     ['appearance', 'Colors', ['psnpColors']]
@@ -3215,6 +3350,7 @@ function observePageChanges() {
             updateRailOverlap();
             markPsnpVersionLabel();
             syncPsnpClassicFilters();
+            placeAllGameControls();
         });
     });
     layoutObserver.observe(document.body, {childList:true, subtree:true});
@@ -3235,7 +3371,10 @@ function observePageChanges() {
         const gameAdded = records.some(record => Array.from(record.addedNodes).some(node =>
             node.nodeType === 1 && (node.matches?.('tr') || node.querySelector?.('tr td a.title[href*="/trophies/"]'))
         ));
-        if (gameAdded) updateGameCabinet();
+        if (gameAdded) {
+            updateGameCabinet();
+            updatePinnedGames();
+        }
     });
     cabinetObserver.observe(document.body, {childList:true, subtree:true});
 }
@@ -3251,6 +3390,7 @@ function observeAccountMenu() {
         if (current !== previous) {
             previous = current;
             renderRail();
+            updatePinnedGames();
         }
     });
     observer.observe(menu, {childList:true, subtree:true});
@@ -3918,6 +4058,19 @@ html.td-hide-psnp-version #header .logo > a[data-td-psnp-version] { display:none
 #trophydeck-rail .td-classic-platforms button:hover:not(:disabled), #trophydeck-rail .td-classic-platforms button.active { background:var(--td-accent); }
 #trophydeck-rail .td-classic-status { display:block; color:#c7d6e4; font-size:11px; line-height:1.4; }
 #trophydeck-rail .td-classic-status:not(:empty) { margin-top:6px; }
+
+/* Empty game notes occupy space only while their row is targeted. */
+.trophydeck-game-note.td-list-game-note.td-note-empty { display:none; }
+tr:hover .trophydeck-game-note.td-list-game-note.td-note-empty,
+tr:focus-within .trophydeck-game-note.td-list-game-note.td-note-empty { display:flex; }
+@media (hover:none) { .trophydeck-game-note.td-list-game-note.td-note-empty { display:flex; } }
+.td-game-pin { display:inline-flex; align-items:center; justify-content:center; vertical-align:middle; width:20px; height:20px; padding:2px; border:0; background:transparent; color:var(--td-accent); cursor:pointer; }
+.td-game-pin svg { display:block; width:16px; height:16px; }
+.td-game-pin[data-pinned="true"] { opacity:1 !important; }
+@media (hover:hover) and (pointer:fine) {
+ .td-game-pin:not([data-pinned="true"]) { opacity:0; pointer-events:none; }
+ tr:hover .td-game-pin, tr:focus-within .td-game-pin { opacity:1; pointer-events:auto; }
+}
 `;
     document.head.append(style);
 
@@ -3930,6 +4083,7 @@ html.td-hide-psnp-version #header .logo > a[data-td-psnp-version] { display:none
     updateGameNotes();
     updateStickyNav();
     updateGameCabinet();
+    updatePinnedGames();
     setupProfileLayoutEditor();
     applyProfileLayout();
     setupScrollControls();
