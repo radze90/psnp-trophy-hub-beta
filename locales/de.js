@@ -378,5 +378,16 @@ var __trophyDeckLocale_de = {
   "Pin games to the top of any profile game list.": "Heftet Spiele an den Anfang der Spieleliste eines beliebigen Profils.",
   "Unpin games on all profiles": "Pins aller Profile löschen",
   "Remove all pinned games on every profile? Game notes and cabinet entries will remain.": "Alle angehefteten Spiele auf allen Profilen lösen? Spielnotizen und Cabinet-Einträge bleiben erhalten.",
-  "Remove saved pins from every profile in this browser.": "Entfernt die gespeicherten Pins aller Profile in diesem Browser."
+  "Remove saved pins from every profile in this browser.": "Entfernt die gespeicherten Pins aller Profile in diesem Browser.",
+  "Game database": "Spieldatenbank",
+  "Collect game data": "Spieldaten sammeln",
+  "Collects public trophy list details from pages you visit. Data stays in this browser until you export it.": "Sammelt öffentliche Trophäenlisten-Daten besuchter Seiten. Die Daten bleiben bis zum Export in diesem Browser.",
+  "Could not save game data. Browser storage may be full.": "Spieldaten konnten nicht gespeichert werden. Der Browserspeicher ist möglicherweise voll.",
+  " trophy lists saved locally.": " Trophäenlisten lokal gespeichert.",
+  "Saved game data could not be read.": "Gespeicherte Spieldaten konnten nicht gelesen werden.",
+  "Preview export": "Exportvorschau",
+  "Game database export preview": "Vorschau des Spieldaten-Exports",
+  "Export game data": "Spieldaten exportieren",
+  "Delete collected game data": "Gesammelte Spieldaten löschen",
+  "Delete all locally collected game data? Notes and other settings will remain.": "Alle lokal gesammelten Spieldaten löschen? Notizen und andere Einstellungen bleiben erhalten."
 };

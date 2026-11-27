@@ -378,5 +378,16 @@ var __trophyDeckLocale_en = {
   "Pin games to the top of any profile game list.": "Pin games to the top of any profile game list.",
   "Unpin games on all profiles": "Unpin games on all profiles",
   "Remove all pinned games on every profile? Game notes and cabinet entries will remain.": "Remove all pinned games on every profile? Game notes and cabinet entries will remain.",
-  "Remove saved pins from every profile in this browser.": "Remove saved pins from every profile in this browser."
+  "Remove saved pins from every profile in this browser.": "Remove saved pins from every profile in this browser.",
+  "Game database": "Game database",
+  "Collect game data": "Collect game data",
+  "Collects public trophy list details from pages you visit. Data stays in this browser until you export it.": "Collects public trophy list details from pages you visit. Data stays in this browser until you export it.",
+  "Could not save game data. Browser storage may be full.": "Could not save game data. Browser storage may be full.",
+  " trophy lists saved locally.": " trophy lists saved locally.",
+  "Saved game data could not be read.": "Saved game data could not be read.",
+  "Preview export": "Preview export",
+  "Game database export preview": "Game database export preview",
+  "Export game data": "Export game data",
+  "Delete collected game data": "Delete collected game data",
+  "Delete all locally collected game data? Notes and other settings will remain.": "Delete all locally collected game data? Notes and other settings will remain."
 };

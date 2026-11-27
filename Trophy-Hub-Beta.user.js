@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.57
+// @version      1.0.58
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.57";
+const APP_VERSION = "1.0.58";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -61,6 +61,7 @@ const features = [
     { key: 'trophydeck.cabinetNames', label: t("Show game names in cabinet"), defaultValue: false },
     { key: 'trophydeck.scrollButtons', label: t("Show scroll-to-bottom button"), defaultValue: true },
     { key: 'trophydeck.globalNote', label: t("Global note in the deck"), defaultValue: true },
+    { key: 'trophydeck.collectGameCatalog', label: t('Collect game data'), defaultValue: false },
     { key: 'trophydeck.pinGames', label: t('Pin games on profile pages'), defaultValue: true },
     { key: 'trophydeck.gameNotes', label: t("Show notes below games"), defaultValue: true },
     { key: 'trophydeck.stickyNav', label: t("Keep profile navigation visible when scrolling"), defaultValue: true },
@@ -189,6 +190,10 @@ function toggleControl(feature) {
             updateGameCabinet();
             updatePinnedGames();
             setupScrollControls();
+            if (feature.key === 'trophydeck.collectGameCatalog') {
+                if (input.checked) collectGameCatalog();
+                updateCatalogSettings();
+            }
             document.querySelectorAll('[data-epic-toggle]').forEach(other => {
                     if (other.dataset.epicToggle === feature.key) {
                         other.checked = input.checked;
@@ -198,7 +203,7 @@ function toggleControl(feature) {
     input.dataset.epicToggle = feature.key;
     const copy=make('span');
     copy.append(make('span',feature.label));
-    const descriptions={pinGames:t('Pin games to the top of any profile game list.'),hidePsnpVersion:t('Hides the PSNP+ version below the site logo.'),showAccountLinks:t('Links to your own profile and account pages.'),hideFlaggedBox:t("Hides the leaderboard notice on profile pages."),showRail:t("Shows Trophy Deck as a collapsible sidebar."),showStats:t("Calculates additional profile statistics."),showLinks:t("Provides preset views of the game list."),showNote:t("A note for the profile currently displayed."),globalNote:t("The same note on every page."),favorites:t("Saves profile links as favorites."),cabinet:t("Use the star in the profile game list to save games to the cabinet."),cabinetNames:t("Shows shortened game names below covers."),scrollButtons:t("Adds a scroll-to-bottom button next to the scroll-to-top button."),customLinks:t("Manage your own links and categories."),gameNotes:t("Shows the same game note across profiles on this browser."),noteWrap:t("Displays long game notes over multiple lines."),stickyNav:t("Keeps the profile navigation with Profile, Trophy Log and Stats visible while scrolling."),psnpColors:t("Applies the selected theme to page headers and dialogs."),analytics:t("Counts selected actions locally; nothing is sent automatically.")};
+    const descriptions={collectGameCatalog:t('Collects public trophy list details from pages you visit. Data stays in this browser until you export it.'),pinGames:t('Pin games to the top of any profile game list.'),hidePsnpVersion:t('Hides the PSNP+ version below the site logo.'),showAccountLinks:t('Links to your own profile and account pages.'),hideFlaggedBox:t("Hides the leaderboard notice on profile pages."),showRail:t("Shows Trophy Deck as a collapsible sidebar."),showStats:t("Calculates additional profile statistics."),showLinks:t("Provides preset views of the game list."),showNote:t("A note for the profile currently displayed."),globalNote:t("The same note on every page."),favorites:t("Saves profile links as favorites."),cabinet:t("Use the star in the profile game list to save games to the cabinet."),cabinetNames:t("Shows shortened game names below covers."),scrollButtons:t("Adds a scroll-to-bottom button next to the scroll-to-top button."),customLinks:t("Manage your own links and categories."),gameNotes:t("Shows the same game note across profiles on this browser."),noteWrap:t("Displays long game notes over multiple lines."),stickyNav:t("Keeps the profile navigation with Profile, Trophy Log and Stats visible while scrolling."),psnpColors:t("Applies the selected theme to page headers and dialogs."),analytics:t("Counts selected actions locally; nothing is sent automatically.")};
     const desc=descriptions[feature.key.replace('trophydeck.','')];
     if(desc){
         copy.append(make('small',desc,'td-setting-description'));
@@ -382,6 +387,7 @@ function openSettings() {
         ['deck', 'Trophy Deck', ['showRail']],
         ['blocks', "Deck sections", ['showAccountLinks', 'showStats', 'showLinks', 'showNote', 'globalNote', 'customLinks', 'favorites', 'cabinet', 'cabinetNames']],
         ['notes', "Game notes", ['gameNotes', 'noteWrap']],
+        ['catalog', 'Game database', ['collectGameCatalog']],
         ['colors', "Colors", ['psnpColors']],
         ['analytics', "Usage statistics", ['analytics']],
         ['backup', 'Backup', []],
@@ -545,6 +551,29 @@ function openSettings() {
             localStorage.removeItem('trophydeck.usage');
         });
     statsActions.append(clearUsage);
+    const catalogStats = make('p', '', 'epic-muted');
+    catalogStats.dataset.tdCatalogStats = 'true';
+    const catalogPreview = make('details', null, 'td-catalog-preview');
+    catalogPreview.append(make('summary', t('Preview export')));
+    const catalogText = make('textarea');
+    catalogText.readOnly = true;
+    catalogText.setAttribute('aria-label', t('Game database export preview'));
+    catalogText.dataset.tdCatalogPreview = 'true';
+    catalogPreview.append(catalogText);
+    const catalogActions = make('div', null, 'td-setting-actions');
+    const catalogExport = make('button', t('Export game data'), 'epic-button');
+    catalogExport.type = 'button';
+    catalogExport.addEventListener('click', downloadGameCatalog);
+    const catalogDelete = make('button', t('Delete collected game data'), 'epic-button td-danger');
+    catalogDelete.type = 'button';
+    catalogDelete.addEventListener('click', async () => {
+        if (!await tdDialog(t('Delete collected game data'), [], t('Delete all locally collected game data? Notes and other settings will remain.'))) return;
+        localStorage.removeItem(GAME_CATALOG_KEY);
+        updateCatalogSettings();
+    });
+    catalogActions.append(catalogExport, catalogDelete);
+    sections.catalog.append(catalogStats, catalogPreview, catalogActions);
+
     const exportAll=make('button',t("Download backup"),'epic-button');
     exportAll.type='button';
     exportAll.addEventListener('click',exportData);
@@ -770,6 +799,7 @@ function openSettings() {
     dialog.addEventListener('close', () => dialog.remove());
     document.body.append(dialog);
     prepareDialog(dialog);
+    updateCatalogSettings();
     dialog.showModal();
 }
 
@@ -3318,6 +3348,180 @@ function setupProfileLayoutEditor() {
 }
 
 
+// Only public trophy-list metadata is collected. PSN identifiers and profile
+// names are deliberately excluded. Related IDs describe observed PSNP links.
+const GAME_CATALOG_KEY = 'trophydeck.gameCatalog';
+const GAME_CATALOG_REGIONS = {
+    'european list':'EU', 'japanese list':'JP', 'north american list':'NA',
+    'united kingdom list':'UK', 'asian list':'AS', 'australian list':'AU',
+    'brazilian list':'BR', 'chinese list':'CN', 'french list':'FR',
+    'german list':'GER', 'hong kong list':'HK', 'korean list':'KR',
+    'russian list':'RU', 'saudi arabian list':'SA', 'spanish list':'ES',
+    'taiwanese list':'TW', 'western list':'WE', 'digital edition list':'DG',
+    'physical/disc list':'PH', 'original list':'OR', 'rereleased list':'RR',
+    'pre-order bonus list':'PO', 'bonus/bundle list':'BO'
+};
+const GAME_CATALOG_CODES = new Set(Object.values(GAME_CATALOG_REGIONS));
+
+function catalogRegion(text) {
+    const value = String(text || '').trim().replace(/\s+/g, ' ');
+    return GAME_CATALOG_REGIONS[value.toLowerCase()] || (GAME_CATALOG_CODES.has(value.toUpperCase()) ? value.toUpperCase() : null);
+}
+
+function catalogListLink(href) {
+    try {
+        const url = new URL(href, location.href);
+        if (url.origin !== 'https://psnprofiles.com') return null;
+        const match = url.pathname.match(/^\/trophies\/(\d+)-([^/]+)\/?$/);
+        if (!match || !Number.isSafeInteger(Number(match[1]))) return null;
+        return {id:Number(match[1]), slug:match[2]};
+    } catch (_) { return null; }
+}
+
+function catalogPlatforms(container) {
+    if (!container) return [];
+    const platforms = new Set();
+    container.querySelectorAll('.platforms .tag.platform').forEach(tag => {
+        if (Array.from(tag.classList).some(name => name.startsWith('psnpp-'))) return;
+        const value = tag.textContent.trim().toUpperCase().replace(/\s+/g, ' ');
+        if (value && value.length <= 20) platforms.add(value);
+    });
+    return Array.from(platforms).sort();
+}
+
+function readGameCatalog() {
+    const raw = localStorage.getItem(GAME_CATALOG_KEY);
+    if (raw === null) return {records:{}};
+    try {
+        const value = JSON.parse(raw);
+        if (value && value.version === 1 && value.records && typeof value.records === 'object' && !Array.isArray(value.records)) return value;
+    } catch (_) {}
+    return null;
+}
+
+function parseCatalogPage() {
+    if (!/^\/trophies\/\d+-[^/]+(?:\/[^/]+)?\/?$/.test(location.pathname)) return null;
+    const canonical = document.querySelector('link[rel="canonical"]');
+    const current = canonical && catalogListLink(canonical.href);
+    if (!current) return null;
+    const pageMatch = location.pathname.match(/^\/trophies\/(\d+)-/);
+    if (!pageMatch || Number(pageMatch[1]) !== current.id) return null;
+    const titleMeta = document.querySelector('meta[property="og:title"]');
+    const name = (titleMeta?.content || '').replace(/\s+Trophies\s*$/i, '').trim();
+    if (!name) return null;
+    const image = document.querySelector('#content .game-image-holder');
+    const details = image?.nextElementSibling;
+    if (!details || !details.matches('.box')) return null;
+    const infoTable = details.querySelector('table.zebra');
+    if (!infoTable) return null;
+    const label = Array.from(infoTable.querySelectorAll('th')).find(th => /\blist\s*$/i.test(th.textContent.trim()));
+    const records = [{...current, name, p:catalogPlatforms(infoTable), r:catalogRegion(label?.textContent), detail:true, links:[]}];
+    const relatedHeader = Array.from(document.querySelectorAll('#content h3')).find(heading => heading.textContent.trim() === 'Other Platforms and Regions');
+    const relatedTable = relatedHeader?.closest('.title')?.nextElementSibling;
+    if (relatedTable?.matches('table')) {
+        relatedTable.querySelectorAll('tr').forEach(row => {
+            const link = Array.from(row.querySelectorAll('a[href]')).map(a => catalogListLink(a.href)).find(Boolean);
+            if (!link || link.id === current.id) return;
+            const region = catalogRegion(row.querySelector('.typo-top')?.textContent);
+            records.push({...link, name, p:catalogPlatforms(row), r:region, detail:false, links:[current.id]});
+            records[0].links.push(link.id);
+        });
+    }
+    return records;
+}
+
+function mergeCatalogRecords(catalog, records) {
+    for (const incoming of records) {
+        const key = String(incoming.id);
+        const previous = catalog.records[key];
+        if (!previous) {
+            catalog.records[key] = {...incoming, links:[...new Set(incoming.links)]};
+            continue;
+        }
+        const authoritative = incoming.detail || !previous.detail;
+        catalog.records[key] = {
+            id:incoming.id,
+            slug:authoritative ? incoming.slug : previous.slug,
+            name:authoritative ? incoming.name : previous.name,
+            p:incoming.detail && incoming.p.length ? incoming.p : Array.from(new Set([...(previous.p || []), ...incoming.p])).sort(),
+            r:incoming.detail ? (incoming.r || previous.r || null) : (previous.r || incoming.r || null),
+            detail:!!(previous.detail || incoming.detail),
+            links:[...new Set([...(previous.links || []), ...incoming.links])]
+        };
+    }
+}
+
+function collectGameCatalog() {
+    if (!enabled('trophydeck.collectGameCatalog')) return false;
+    const records = parseCatalogPage();
+    if (!records) return false;
+    const catalog = readGameCatalog();
+    if (!catalog) return false;
+    catalog.version = 1;
+    mergeCatalogRecords(catalog, records);
+    try {
+        const value = JSON.stringify(catalog);
+        if (localStorage.getItem(GAME_CATALOG_KEY) !== value) localStorage.setItem(GAME_CATALOG_KEY, value);
+        updateCatalogSettings();
+        return true;
+    } catch (_) {
+        updateCatalogSettings(t('Could not save game data. Browser storage may be full.'));
+        return false;
+    }
+}
+
+// Group only lists connected by observed links, never by title similarity.
+function exportGameCatalogData(catalog) {
+    const records = Object.values(catalog.records).filter(item => item && Number.isSafeInteger(item.id));
+    const byId = new Map(records.map(item => [item.id, item]));
+    const neighbours = new Map(records.map(item => [item.id, new Set()]));
+    records.forEach(item => (item.links || []).forEach(id => {
+        if (byId.has(id)) { neighbours.get(item.id).add(id); neighbours.get(id).add(item.id); }
+    }));
+    const seen = new Set(), games = [];
+    records.sort((a,b) => a.id - b.id).forEach(item => {
+        if (seen.has(item.id)) return;
+        const stack = [item.id], group = [];
+        while (stack.length) {
+            const id = stack.pop();
+            if (seen.has(id)) continue;
+            seen.add(id);
+            group.push(byId.get(id));
+            neighbours.get(id).forEach(other => { if (!seen.has(other)) stack.push(other); });
+        }
+        group.sort((a,b) => a.id - b.id);
+        const named = group.find(entry => entry.detail) || group[0];
+        games.push({name:named.name, lists:group.map(entry => ({id:entry.id, slug:entry.slug, p:entry.p || [], r:entry.r || null}))});
+    });
+    return {v:1, games};
+}
+
+function gameCatalogJson() {
+    const catalog = readGameCatalog();
+    return catalog ? JSON.stringify(exportGameCatalogData(catalog), null, 2) : null;
+}
+
+function downloadGameCatalog() {
+    const json = gameCatalogJson();
+    if (json === null) return;
+    const url = URL.createObjectURL(new Blob([json], {type:'application/json'}));
+    const link = make('a');
+    link.href = url;
+    link.download = 'trophy-hub-games.json';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function updateCatalogSettings(message = '') {
+    const stats = document.querySelector('[data-td-catalog-stats]');
+    if (!stats) return;
+    const catalog = readGameCatalog();
+    stats.textContent = message || (catalog ? Object.keys(catalog.records).length + t(' trophy lists saved locally.') : t('Saved game data could not be read.'));
+    const preview = document.querySelector('[data-td-catalog-preview]');
+    if (preview) preview.value = gameCatalogJson() || '';
+}
+
+
 const quickSettingGroups = [
     ['profile', 'Profile page', ['hideFlaggedBox', 'stickyNav', 'scrollButtons', 'cabinet', 'cabinetNames', 'hidePsnpVersion', 'pinGames']],
     ['deck', 'Deck sections', ['showAccountLinks', 'showStats', 'showLinks', 'showNote', 'globalNote', 'customLinks', 'favorites']],
@@ -4301,10 +4505,15 @@ caption[data-td-pinned-header] { caption-side:top; text-align:left; padding:7px 
 /* These two site sections have no native bottom margin, unlike the cabinet. */
 #content > .td-unified-grid > [data-td-profile-section="milestones"],
 #content > .td-unified-grid > [data-td-profile-section="rarest"] { padding-bottom:10px; }
+
+#trophydeck-settings .td-catalog-preview { margin:12px 0; }
+#trophydeck-settings .td-catalog-preview summary { cursor:pointer; font-weight:bold; }
+#trophydeck-settings .td-catalog-preview textarea { display:block; box-sizing:border-box; width:100%; min-height:180px; margin-top:8px; padding:8px; resize:vertical; background:color-mix(in srgb,white 92%,var(--td-accent)); color:#222; font:12px/1.4 monospace; }
 `;
     document.head.append(style);
 
     applyTheme();
+    collectGameCatalog();
     markPsnpVersionLabel();
     applyPagePosition();
     migrateGameNotes();
