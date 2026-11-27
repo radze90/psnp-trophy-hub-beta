@@ -3,7 +3,7 @@
 // @namespace    trophydeck.local
 // @updateURL    https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
 // @downloadURL  https://raw.githubusercontent.com/radze90/psnp-trophy-hub-beta/main/Trophy-Hub-Beta.user.js
-// @version      1.0.49
+// @version      1.0.50
 // @description  Enhancements for PSNProfiles and PSNP+
 // @match        https://psnprofiles.com/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 // Translation catalogs are loaded separately by Tampermonkey using @require.
 const translations = {"de": __trophyDeckLocale_de, "en": __trophyDeckLocale_en};
 const languageOptions = [["de","Deutsch"],["en","English"]];
-const APP_VERSION = "1.0.49";
+const APP_VERSION = "1.0.50";
 
 function getLanguage() {
     const saved = localStorage.getItem('trophydeck.language');
@@ -2496,20 +2496,31 @@ function isOwnGameProfile(profile) {
 function placeGameControls(cell) {
     const title = cell.querySelector('a.title[href*="/trophies/"]');
     const line = title?.closest('span') || cell.querySelector('.ellipsis');
-    if (!line) return;
-    const pin = cell.querySelector('.td-game-pin');
     const star = cell.querySelector('.td-cabinet-add');
-    // Place controls after site/PSNP+ icons, with the cabinet star last.
-    if (star && (star.parentElement !== line || line.lastElementChild !== star)) line.append(star);
-    if (pin && (pin.parentElement !== line || (star && pin.nextElementSibling !== star) || (!star && line.lastElementChild !== pin))) {
-        line.insertBefore(pin, star?.parentElement === line ? star : null);
+    if (line && star && (star.parentElement !== line || line.lastElementChild !== star)) line.append(star);
+
+    const row = cell.closest('tr');
+    const pin = row?.querySelector('.td-game-pin');
+    if (!row || !pin) return;
+    const psnpAction = row.querySelector('.psnpp-list-button')?.closest('td');
+    let ownCell = row.querySelector('td.td-game-pin-cell');
+    if (psnpAction) {
+        if (pin.parentElement !== psnpAction) psnpAction.append(pin);
+        if (ownCell) ownCell.remove();
+    } else {
+        if (!ownCell) {
+            ownCell = make('td', null, 'td-game-pin-cell');
+            row.append(ownCell);
+        }
+        if (pin.parentElement !== ownCell) ownCell.append(pin);
     }
 }
 
 function placeAllGameControls() {
     document.querySelectorAll('tr td a.title[href*="/trophies/"]').forEach(link => {
         const cell = link.closest('td');
-        if (cell && (cell.querySelector('.td-game-pin') || cell.querySelector('.td-cabinet-add'))) placeGameControls(cell);
+        const row = link.closest('tr');
+        if (cell && (row?.querySelector('.td-game-pin') || cell.querySelector('.td-cabinet-add'))) placeGameControls(cell);
     });
 }
 
@@ -2530,7 +2541,7 @@ function createGamePinButton(id, profile) {
     icon.setAttribute('stroke-linecap', 'round');
     icon.setAttribute('stroke-linejoin', 'round');
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', 'M16 3l5 5-3 1-3 4 1 3-1 1-4-4-6 6-1 1 1-1 6-6-4-4 1-1 3 1 4-3 1-3z');
+    path.setAttribute('d', 'M8 3h8M9 3v5l-3 4v2h12v-2l-3-4V3M12 14v7');
     icon.append(path);
     button.append(icon);
     button.addEventListener('click', () => {
@@ -2561,12 +2572,16 @@ function updatePinnedGames() {
         const match = url.pathname.match(/^\/trophies\/(\d+)(?:-[^/]*)?\/([^/]+)\/?$/);
         if (url.origin !== location.origin || !match || !profile || ('/' + match[2]).toLowerCase() !== profile.path.toLowerCase()) return;
         const id = match[1];
-        let button = cell.querySelector('.td-game-pin');
+        let button = row.querySelector('.td-game-pin');
         if (active && !button) {
             button = createGamePinButton(id, profile);
             link.parentElement.append(button);
         }
-        if (!active && button) { button.remove(); button = null; }
+        if (!active && button) {
+            button.remove();
+            row.querySelector('td.td-game-pin-cell')?.remove();
+            button = null;
+        }
         const pinned = active && saved.includes(id);
         if (row.dataset.tdPinnedCache && !pinned) { row.remove(); return; }
         row.classList.toggle('td-pinned-game', pinned);
@@ -2627,6 +2642,12 @@ function cleanPinnedRow(row) {
     clone.removeAttribute('id');
     clone.removeAttribute('style');
     clone.classList.remove('td-pinned-game');
+    // PSNP+ actions have live handlers and cannot be copied as inert HTML.
+    clone.querySelectorAll('.psnpp-list-button').forEach(button => {
+        const cell = button.closest('td');
+        if (cell) cell.remove(); else button.remove();
+    });
+    clone.querySelectorAll('td.td-game-pin-cell').forEach(cell => cell.remove());
     clone.querySelectorAll('script, style, iframe, object, embed, form, input, button, .trophydeck-game-note, .td-cabinet-add, .td-game-pin').forEach(element => element.remove());
     [clone, ...clone.querySelectorAll('*')].forEach(element => {
         for (const attribute of Array.from(element.attributes)) {
@@ -4151,8 +4172,10 @@ html.td-hide-psnp-version #header .logo > a[data-td-psnp-version] { display:none
 #trophydeck-rail .td-classic-status:not(:empty) { margin-top:6px; }
 
 /* Game note placeholders keep the row height stable on hover. */
-.td-game-pin { display:inline-flex; align-items:center; justify-content:center; vertical-align:middle; width:20px; height:20px; padding:2px; border:0; background:transparent; color:var(--td-accent); cursor:pointer; }
+.td-game-pin { display:flex; align-items:center; justify-content:center; margin:5px auto 0; width:30px; height:24px; padding:3px; border:0; background:transparent; color:var(--td-accent); cursor:pointer; }
 .td-game-pin svg { display:block; width:16px; height:16px; }
+td.td-game-pin-cell { text-align:center; vertical-align:middle; }
+td.td-game-pin-cell .td-game-pin { margin:0 auto; }
 .td-game-pin[data-pinned="true"] { opacity:1 !important; }
 @media (hover:hover) and (pointer:fine) {
  .td-game-pin:not([data-pinned="true"]) { opacity:0; pointer-events:none; }
@@ -4160,6 +4183,11 @@ html.td-hide-psnp-version #header .logo > a[data-td-psnp-version] { display:none
 }
 
 caption[data-td-pinned-header] { caption-side:top; text-align:left; padding:7px 10px; color:#fff; background:var(--td-accent,#315c89); font-weight:bold; text-transform:uppercase; font-size:12px; }
+
+/* Keep pinned rows visually distinct without adding fake game rows. */
+#gamesTable tr.td-pinned-game > td { background:color-mix(in srgb,var(--td-accent) 10%,#f5f6f8); }
+#gamesTable tr.td-pinned-game > td:first-child { box-shadow:inset 3px 0 var(--td-accent); }
+#gamesTable tr.td-pinned-game + tr:not(.td-pinned-game) > td { border-top:3px solid var(--td-accent); }
 `;
     document.head.append(style);
 
@@ -4169,10 +4197,10 @@ caption[data-td-pinned-header] { caption-side:top; text-align:left; padding:7px 
     migrateGameNotes();
     updateFlagged();
     renderRail();
-    updateGameNotes();
     updateStickyNav();
-    updateGameCabinet();
     updatePinnedGames();
+    updateGameNotes();
+    updateGameCabinet();
     setupProfileLayoutEditor();
     applyProfileLayout();
     setupScrollControls();
